@@ -1,0 +1,50 @@
+{
+  "name": "Perfex Pro - Advanced Performance Analyzer",
+  "short_name": "Perfex Pro",
+  "description": "Professional website performance analysis tool powered by Perfex Performance Engine",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities", "developer"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "32x32",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "Perfex Pro Performance Analyzer Dashboard"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Analysis",
+      "short_name": "Analyze",
+      "description": "Start a new website performance analysis",
+      "url": "/?action=analyze",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "32x32"
+        }
+      ]
+    }
+  ]
+} 

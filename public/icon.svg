@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background with shadow -->
+  <rect width="512" height="512" rx="128" fill="url(#grad1)" filter="url(#shadow)"/>
+  
+  <!-- Performance chart lines -->
+  <path d="M128 256 L192 192 L256 256 L320 224 L384 256" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Data points -->
+  <circle cx="128" cy="256" r="20" fill="white"/>
+  <circle cx="192" cy="192" r="20" fill="white"/>
+  <circle cx="256" cy="256" r="20" fill="white"/>
+  <circle cx="320" cy="224" r="20" fill="white"/>
+  <circle cx="384" cy="256" r="20" fill="white"/>
+  
+  <!-- Secondary chart line -->
+  <path d="M128 384 L192 352 L256 384 L320 368 L384 384" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8"/>
+  
+  <!-- Performance indicator -->
+  <path d="M400 112 L448 160 L400 208" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M400 160 L448 160" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg> 
