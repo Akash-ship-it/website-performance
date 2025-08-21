@@ -921,29 +921,30 @@ export default function AccuratePerformanceAnalyzer() {
       <GradientBackground />
 
       {/* Header */}
-      <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50">
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl px-6 py-3 shadow-2xl shadow-purple-500/10">
-          <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-3">
+      <div className="fixed top-2 sm:top-6 left-1/2 transform -translate-x-1/2 z-50 w-[95%] sm:w-auto max-w-4xl">
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2 sm:py-3 shadow-2xl shadow-purple-500/10">
+          <div className="flex items-center justify-between sm:space-x-8">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-white" />
+                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                 </div>
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+                <div className="absolute -top-1 -right-1 w-2 h-2 sm:w-3 sm:h-3 bg-green-400 rounded-full animate-pulse" />
               </div>
               <div>
-                <h1 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                <h1 className="text-sm sm:text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
                   Perfex Pro
                 </h1>
               </div>
             </div>
-            <div className="flex items-center space-x-4 text-sm">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Badge
                 variant="secondary"
-                className="bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30"
+                className="bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30 text-xs sm:text-sm px-1.5 sm:px-2"
               >
-                <Shield className="h-3 w-3 mr-1" />
-                Perfex Engine
+                <Shield className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                <span className="hidden sm:inline">Perfex Engine</span>
+                <span className="sm:hidden">Engine</span>
               </Badge>
             </div>
           </div>
@@ -952,15 +953,15 @@ export default function AccuratePerformanceAnalyzer() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
         {/* Hero Section */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 rounded-full px-4 py-2 mb-8">
-            <CheckCircle2 className="h-4 w-4 text-green-400" />
-            <span className="text-sm text-green-300 font-medium">
+        <div className="text-center mb-8 sm:mb-16">
+          <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-8">
+            <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+            <span className="text-xs sm:text-sm text-green-300 font-medium">
               Project #3 By <strong> Akash More</strong>
             </span>
           </div>
 
-          <h2 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
+          <h2 className="text-3xl sm:text-5xl md:text-7xl font-black mb-4 sm:mb-6 leading-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
               Perfex Performance
             </span>
@@ -970,7 +971,7 @@ export default function AccuratePerformanceAnalyzer() {
             </span>
           </h2>
 
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed px-4">
             Get advanced performance data from Perfex's infrastructure. Analyze
             Core Web Vitals, accessibility, SEO, and get actionable optimization
             recommendations.
@@ -995,7 +996,7 @@ export default function AccuratePerformanceAnalyzer() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12">
                 <div className="lg:col-span-7">
                   <div className="relative">
                     <Input
@@ -1003,15 +1004,15 @@ export default function AccuratePerformanceAnalyzer() {
                       placeholder="Enter target URL (e.g., https://example.com)"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      className="h-14 text-lg bg-slate-800/50 border-slate-600/50 focus:border-green-500 focus:ring-green-500/20 text-white placeholder-slate-400 pl-12"
+                      className="h-12 sm:h-14 text-base sm:text-lg bg-slate-800/50 border-slate-600/50 focus:border-green-500 focus:ring-green-500/20 text-white placeholder-slate-400 pl-10 sm:pl-12 pr-4"
                     />
-                    <Globe className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
                   </div>
                 </div>
 
                 <div className="lg:col-span-3">
                   <Select value={device} onValueChange={handleDeviceChange}>
-                    <SelectTrigger className="h-14 bg-slate-800/50 border-slate-600/50 focus:border-green-500 text-white">
+                    <SelectTrigger className="h-12 sm:h-14 bg-slate-800/50 border-slate-600/50 focus:border-green-500 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700 text-white">
@@ -1019,15 +1020,15 @@ export default function AccuratePerformanceAnalyzer() {
                         value="desktop"
                         className="focus:bg-slate-700"
                       >
-                        <div className="flex items-center gap-3">
-                          <Monitor className="h-4 w-4 text-blue-400" />
-                          <span>Desktop</span>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <Monitor className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
+                          <span className="text-sm sm:text-base">Desktop</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="mobile" className="focus:bg-slate-700">
-                        <div className="flex items-center gap-3">
-                          <Smartphone className="h-4 w-4 text-purple-400" />
-                          <span>Mobile</span>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <Smartphone className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
+                          <span className="text-sm sm:text-base">Mobile</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -1038,23 +1039,27 @@ export default function AccuratePerformanceAnalyzer() {
                   <Button
                     onClick={analyzeWebsite}
                     disabled={isAnalyzing || !url}
-                    className="h-14 w-full bg-gradient-to-r from-green-600 via-blue-600 to-cyan-600 hover:from-green-700 hover:via-blue-700 hover:to-cyan-700 text-white border-0 font-semibold shadow-lg shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-12 sm:h-14 w-full bg-gradient-to-r from-green-600 via-blue-600 to-cyan-600 hover:from-green-700 hover:via-blue-700 hover:to-cyan-700 text-white border-0 font-semibold shadow-lg shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                   >
                     {isAnalyzing ? (
                       <>
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        Analyzing...
+                        <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" />
+                        <span className="hidden sm:inline">Analyzing...</span>
+                        <span className="sm:hidden">...</span>
                       </>
                     ) : (
                       <>
-                        <Play className="h-5 w-5 mr-2" />
-                        {results &&
-                        url === lastAnalyzedUrl &&
-                        device !== lastAnalyzedDevice
-                          ? `Analyze ${
-                              device === "mobile" ? "Mobile" : "Desktop"
-                            }`
-                          : "Analyze"}
+                        <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                        <span className="hidden sm:inline">
+                          {results &&
+                          url === lastAnalyzedUrl &&
+                          device !== lastAnalyzedDevice
+                            ? `Analyze ${
+                                device === "mobile" ? "Mobile" : "Desktop"
+                              }`
+                            : "Analyze"}
+                        </span>
+                        <span className="sm:hidden">Analyze</span>
                       </>
                     )}
                   </Button>
@@ -1235,21 +1240,21 @@ export default function AccuratePerformanceAnalyzer() {
             </Card>
 
             {/* Core Web Vitals Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {metricCards.map((metric, index) => (
                 <Card
                   key={index}
                   className="bg-slate-900/50 backdrop-blur-xl border-slate-700/50 hover:border-slate-600/50 transition-all duration-300 group"
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-3 sm:mb-4">
                       <div
-                        className={`p-3 rounded-xl bg-slate-800/50 group-hover:bg-slate-700/50 transition-colors ${metric.color}`}
+                        className={`p-2 sm:p-3 rounded-xl bg-slate-800/50 group-hover:bg-slate-700/50 transition-colors ${metric.color}`}
                       >
                         {metric.icon}
                       </div>
                       <div
-                        className={`p-2 rounded-lg ${
+                        className={`p-1.5 sm:p-2 rounded-lg ${
                           metric.trend === "up"
                             ? "bg-emerald-500/20 text-emerald-400"
                             : metric.trend === "down"
@@ -1269,7 +1274,7 @@ export default function AccuratePerformanceAnalyzer() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-3xl font-bold text-white group-hover:text-slate-100 transition-colors">
+                      <p className="text-2xl sm:text-3xl font-bold text-white group-hover:text-slate-100 transition-colors">
                         {metric.value}
                       </p>
                       <p className="text-sm font-medium text-slate-300 group-hover:text-slate-200 transition-colors">
@@ -1287,75 +1292,122 @@ export default function AccuratePerformanceAnalyzer() {
             {/* Advanced Analytics Dashboard */}
             <Card className="bg-slate-900/50 backdrop-blur-xl border-slate-700/50 shadow-2xl">
               <Tabs defaultValue="overview" className="w-full">
-                <div className="border-b border-slate-700/50 px-8 pt-6">
-                  <TabsList className="grid w-full grid-cols-9 bg-slate-800/30 p-1 rounded-xl">
-                    <TabsTrigger
-                      value="overview"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      Scores
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="vitals"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Activity className="h-4 w-4 mr-2" />
-                      Core Vitals
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="field-vs-lab"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Gauge className="h-4 w-4 mr-2" />
-                      Field vs Lab
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="benchmark"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Target className="h-4 w-4 mr-2" />
-                      Benchmark
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="accessibility"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Shield className="h-4 w-4 mr-2" />
-                      Accessibility
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="seo"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Star className="h-4 w-4 mr-2" />
-                      SEO
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="opportunities"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Target className="h-4 w-4 mr-2" />
-                      Optimize
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="diagnostics"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <Info className="h-4 w-4 mr-2" />
-                      Diagnostics
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="history"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
-                    >
-                      <TrendingUp className="h-4 w-4 mr-2" />
-                      History
-                    </TabsTrigger>
-                  </TabsList>
+                <div className="border-b border-slate-700/50 px-2 sm:px-8 pt-4 sm:pt-6">
+                  {/* MOBILE TABS - Horizontal scroll */}
+                  <div className="sm:hidden">
+                    <TabsList className="w-full bg-slate-800/30 p-1 rounded-xl flex overflow-x-auto scrollbar-hide">
+                      <TabsTrigger
+                        value="overview"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                      >
+                        <BarChart3 className="h-3 w-3 mr-1" />
+                        Scores
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="vitals"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                      >
+                        <Activity className="h-3 w-3 mr-1" />
+                        Vitals
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="field-vs-lab"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                      >
+                        <Gauge className="h-3 w-3 mr-1" />
+                        Lab
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="opportunities"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                      >
+                        <Target className="h-3 w-3 mr-1" />
+                        Fix
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="history"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                      >
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        History
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  {/* DESKTOP TABS - Grid layout */}
+                  <div className="hidden sm:block">
+                    <TabsList className="grid w-full grid-cols-9 bg-slate-800/30 p-1 rounded-xl">
+                      <TabsTrigger
+                        value="overview"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Scores
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="vitals"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Activity className="h-4 w-4 mr-2" />
+                        Core Vitals
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="field-vs-lab"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Gauge className="h-4 w-4 mr-2" />
+                        Field vs Lab
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="benchmark"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Benchmark
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="accessibility"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Accessibility
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="seo"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        SEO
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="opportunities"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Optimize
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="diagnostics"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <Info className="h-4 w-4 mr-2" />
+                        Diagnostics
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="history"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg"
+                      >
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        History
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
                 </div>
 
-                <TabsContent value="overview" className="p-8 space-y-8">
+                <TabsContent
+                  value="overview"
+                  className="p-4 sm:p-8 space-y-6 sm:space-y-8"
+                >
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     {/* All Scores */}
                     <div className="space-y-6">
@@ -2783,40 +2835,40 @@ export default function AccuratePerformanceAnalyzer() {
 
             {/* Export & Actions */}
             <Card className="bg-slate-900/50 backdrop-blur-xl border-slate-700/50">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                      <Download className="h-6 w-6 text-white" />
+              <CardContent className="p-4 sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
+                      <Download className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                     </div>
                     <div>
-                      <h4 className="text-xl font-bold text-white">
+                      <h4 className="text-lg sm:text-xl font-bold text-white">
                         Export Report
                       </h4>
-                      <p className="text-slate-400">
+                      <p className="text-sm sm:text-base text-slate-400">
                         Download Perfex performance data
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
                     <Button
                       onClick={exportResults}
-                      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-green-500/25"
+                      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-green-500/25 text-sm sm:text-base"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export JSON
                     </Button>
                     <Button
                       onClick={exportHistoryCSV}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25 text-sm sm:text-base"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
                     </Button>
                     <Button
                       onClick={exportPDF}
-                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white border-0 shadow-lg shadow-red-500/25"
+                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white border-0 shadow-lg shadow-red-500/25 text-sm sm:text-base"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export PDF
