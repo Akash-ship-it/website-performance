@@ -186,7 +186,7 @@ export default function AccuratePerformanceAnalyzer() {
 
   // Load history and implemented opportunities from localStorage on mount
   useEffect(() => {
-    const savedHistory = localStorage.getItem('pagespeed-history');
+    const savedHistory = localStorage.getItem('perfex-history');
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory));
@@ -195,7 +195,7 @@ export default function AccuratePerformanceAnalyzer() {
       }
     }
 
-    const savedOpportunities = localStorage.getItem('implemented-opportunities');
+    const savedOpportunities = localStorage.getItem('perfex-implemented-opportunities');
     if (savedOpportunities) {
       try {
         setImplementedOpportunities(new Set(JSON.parse(savedOpportunities)));
@@ -208,13 +208,13 @@ export default function AccuratePerformanceAnalyzer() {
   // Save history to localStorage whenever it changes
   useEffect(() => {
     if (history.length > 0) {
-      localStorage.setItem('pagespeed-history', JSON.stringify(history));
+      localStorage.setItem('perfex-history', JSON.stringify(history));
     }
   }, [history]);
 
   // Save implemented opportunities to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('implemented-opportunities', JSON.stringify(Array.from(implementedOpportunities)));
+    localStorage.setItem('perfex-implemented-opportunities', JSON.stringify(Array.from(implementedOpportunities)));
   }, [implementedOpportunities]);
 
   const analyzeWebsite = async () => {
@@ -230,7 +230,7 @@ export default function AccuratePerformanceAnalyzer() {
       new URL(testUrl);
 
       setProgress(15);
-      setCurrentStep(compareMode ? "Connecting to Google PageSpeed Insights..." : "Connecting to Google PageSpeed Insights...");
+      setCurrentStep(compareMode ? "Connecting to Perfex Performance Engine..." : "Connecting to Perfex Performance Engine...");
       
       if (compareMode) {
         // Run both desktop and mobile analysis
@@ -269,7 +269,7 @@ export default function AccuratePerformanceAnalyzer() {
       let errorMessage = "Analysis failed. Please check the URL and try again.";
       
       if (err.message.includes("PageSpeed API Error")) {
-        errorMessage = "PageSpeed Insights API is currently unavailable. Please try again later.";
+        errorMessage = "Perfex Performance Engine is currently unavailable. Please try again later.";
       } else if (err.message.includes("Invalid URL")) {
         errorMessage = "Please enter a valid URL (e.g., https://example.com)";
       } else if (err.message.includes("Network")) {
@@ -295,11 +295,11 @@ export default function AccuratePerformanceAnalyzer() {
 
     const data = await response.json();
 
-    if (data.error) {
-      throw new Error(`PageSpeed Analysis Failed: ${data.error.message}`);
-    }
+          if (data.error) {
+        throw new Error(`Perfex Analysis Failed: ${data.error.message}`);
+      }
 
-    // Extract metrics from PageSpeed response
+    // Extract metrics from Perfex response
     const lighthouseResult = data.lighthouseResult;
     const categories = lighthouseResult.categories;
     const audits = lighthouseResult.audits;
@@ -315,7 +315,7 @@ export default function AccuratePerformanceAnalyzer() {
       totalBlockingTime: audits['total-blocking-time']?.numericValue || 0,
     };
 
-    // Performance opportunities
+    // Performance optimization opportunities
     const opportunities = Object.entries(audits)
       .filter(([key, audit]: [string, any]) => 
         audit.scoreDisplayMode === 'numeric' && 
@@ -528,7 +528,7 @@ export default function AccuratePerformanceAnalyzer() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `pagespeed-insights-report-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `perfex-performance-report-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -574,7 +574,7 @@ export default function AccuratePerformanceAnalyzer() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `pagespeed-history-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `perfex-history-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -591,7 +591,7 @@ export default function AccuratePerformanceAnalyzer() {
     // Title
     doc.setFontSize(24);
     doc.setTextColor(33, 33, 33);
-    doc.text("PageSpeed Insights Report", margin, yPosition);
+    doc.text("Perfex Performance Report", margin, yPosition);
     yPosition += 15;
 
     // URL and Date
@@ -674,7 +674,7 @@ export default function AccuratePerformanceAnalyzer() {
     }
 
     // Save PDF
-    doc.save(`pagespeed-report-${new Date().toISOString().split("T")[0]}.pdf`);
+    doc.save(`perfex-performance-report-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const performanceScores = getPerformanceScores();
@@ -721,7 +721,7 @@ export default function AccuratePerformanceAnalyzer() {
               </div>
               <div>
                 <h1 className="text-lg font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                  PageSpeed Insights Pro
+                  Perfex Pro
                 </h1>
               </div>
             </div>
@@ -731,7 +731,7 @@ export default function AccuratePerformanceAnalyzer() {
                 className="bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30"
               >
                 <Shield className="h-3 w-3 mr-1" />
-                Google API
+                Perfex Engine
               </Badge>
             </div>
           </div>
@@ -744,22 +744,22 @@ export default function AccuratePerformanceAnalyzer() {
           <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 rounded-full px-4 py-2 mb-8">
             <CheckCircle2 className="h-4 w-4 text-green-400" />
             <span className="text-sm text-green-300 font-medium">
-              Powered by Google PageSpeed Insights API
+              Powered by Perfex Performance Engine
             </span>
           </div>
 
           <h2 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
             <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
-              Accurate Performance
+              Perfex Performance
             </span>
             <br />
             <span className="bg-gradient-to-r from-green-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              Analysis
+              Analyzer
             </span>
           </h2>
 
           <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Get real performance data from Google's infrastructure. Analyze Core Web Vitals, 
+            Get advanced performance data from Perfex's infrastructure. Analyze Core Web Vitals, 
             accessibility, SEO, and get actionable optimization recommendations.
           </p>
         </div>
@@ -774,10 +774,10 @@ export default function AccuratePerformanceAnalyzer() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-white">
-                    PageSpeed Insights Scanner
+                    Perfex Performance Scanner
                   </h3>
                   <p className="text-slate-400">
-                    Real performance data from Google's servers
+                    Advanced performance data from Perfex servers
                   </p>
                 </div>
               </div>
@@ -875,7 +875,7 @@ export default function AccuratePerformanceAnalyzer() {
                       </div>
                       <div>
                         <p className="text-white font-medium">{currentStep}</p>
-                        <p className="text-sm text-slate-400">Google PageSpeed Insights</p>
+                        <p className="text-sm text-slate-400">Perfex Performance Engine</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -915,13 +915,13 @@ export default function AccuratePerformanceAnalyzer() {
                         <div className="flex items-center space-x-3 mb-4">
                           <Award className="h-6 w-6 text-yellow-400" />
                           <h3 className="text-2xl font-bold text-white">
-                            PageSpeed Score
+                            Performance Score
                           </h3>
                           <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
-                            Google Verified
+                            Perfex Verified
                           </Badge>
                         </div>
-                        <p className="text-slate-300">Real performance data from Google's infrastructure</p>
+                        <p className="text-slate-300">Advanced performance data from Perfex infrastructure</p>
                       </div>
 
                       <div className="text-right">
@@ -1390,7 +1390,7 @@ export default function AccuratePerformanceAnalyzer() {
                                             <Button
                                               size="sm"
                                               variant="outline"
-                                              onClick={() => window.open(`https://pagespeed.web.dev/report?url=${encodeURIComponent(results.url)}`, "_blank")}
+                                              onClick={() => window.open(`https://perfex.com/report?url=${encodeURIComponent(results.url)}`, "_blank")}
                                               className="border-blue-500 text-blue-300 hover:bg-blue-500/20"
                                             >
                                               <ExternalLink className="h-4 w-4 mr-1" />
@@ -2046,7 +2046,7 @@ export default function AccuratePerformanceAnalyzer() {
                     </div>
                     <div>
                       <h4 className="text-xl font-bold text-white">Export Report</h4>
-                      <p className="text-slate-400">Download PageSpeed Insights data</p>
+                                              <p className="text-slate-400">Download Perfex performance data</p>
                     </div>
                   </div>
 
@@ -2054,10 +2054,10 @@ export default function AccuratePerformanceAnalyzer() {
                     <Button
                       variant="outline"
                       className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
-                      onClick={() => window.open(`https://pagespeed.web.dev/report?url=${encodeURIComponent(results.url)}`, "_blank")}
+                      onClick={() => window.open(`https://perfex.com/report?url=${encodeURIComponent(results.url)}`, "_blank")}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      View on PageSpeed Insights
+                      View on Perfex
                     </Button>
                     <Button
                       onClick={exportResults}
@@ -2214,9 +2214,9 @@ export default function AccuratePerformanceAnalyzer() {
         <div className="mt-16 text-center">
           <div className="inline-flex items-center space-x-2 text-slate-500 text-sm">
             <CheckCircle2 className="h-4 w-4" />
-            <span>Powered by Google PageSpeed Insights API</span>
+            <span>Powered by Perfex Performance Engine</span>
             <div className="w-1 h-1 bg-slate-500 rounded-full" />
-            <span>Real performance data</span>
+            <span>Advanced performance data</span>
           </div>
         </div>
       </div>
