@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -76,6 +76,7 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
+import Image from "next/image";
 
 interface PageSpeedMetrics {
   url: string;
@@ -180,6 +181,7 @@ export default function AccuratePerformanceAnalyzer() {
   const [benchmarkUrls, setBenchmarkUrls] = useState<string[]>(["", "", ""]);
   const [benchmarkResults, setBenchmarkResults] = useState<PageSpeedMetrics[]>([]);
   const [implementedOpportunities, setImplementedOpportunities] = useState<Set<string>>(new Set());
+  const analysisCacheRef = useRef<Map<string, PageSpeedMetrics>>(new Map());
 
   const PAGESPEED_API_KEY = process.env.NEXT_PUBLIC_PAGESPEED_API_KEY || ''; // Add your API key here
   const PAGESPEED_API_BASE = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -249,7 +251,7 @@ export default function AccuratePerformanceAnalyzer() {
         setHistory((prev) => [desktopData, mobileData, ...prev.slice(0, 8)]);
       } else {
         // Run single device analysis
-        const strategy = device === "mobile" ? "mobile" : "desktop";
+      const strategy = device === "mobile" ? "mobile" : "desktop";
         const analysisResults = await runSingleAnalysis(testUrl, strategy);
         setResults(analysisResults);
         setHistory((prev) => [analysisResults, ...prev.slice(0, 9)]);
@@ -285,79 +287,84 @@ export default function AccuratePerformanceAnalyzer() {
   };
 
   const runSingleAnalysis = async (testUrl: string, strategy: "desktop" | "mobile"): Promise<PageSpeedMetrics> => {
+    const cacheKey = `${testUrl}|${strategy}`;
+    const cached = analysisCacheRef.current.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
     const apiUrl = `${PAGESPEED_API_BASE}?url=${encodeURIComponent(testUrl)}&strategy=${strategy}&category=performance&category=accessibility&category=best-practices&category=seo${PAGESPEED_API_KEY ? `&key=${PAGESPEED_API_KEY}` : ''}`;
 
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      throw new Error(`PageSpeed API Error: ${response.status} - ${response.statusText}`);
-    }
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`PageSpeed API Error: ${response.status} - ${response.statusText}`);
+      }
 
-    const data = await response.json();
+      const data = await response.json();
 
-          if (data.error) {
+      if (data.error) {
         throw new Error(`Perfex Analysis Failed: ${data.error.message}`);
       }
 
     // Extract metrics from Perfex response
-    const lighthouseResult = data.lighthouseResult;
-    const categories = lighthouseResult.categories;
-    const audits = lighthouseResult.audits;
+      const lighthouseResult = data.lighthouseResult;
+      const categories = lighthouseResult.categories;
+      const audits = lighthouseResult.audits;
 
-    // Core Web Vitals and other metrics
-    const metrics = {
-      firstContentfulPaint: audits['first-contentful-paint']?.numericValue || 0,
-      largestContentfulPaint: audits['largest-contentful-paint']?.numericValue || 0,
-      firstInputDelay: audits['max-potential-fid']?.numericValue || 0,
+      // Core Web Vitals and other metrics
+      const metrics = {
+        firstContentfulPaint: audits['first-contentful-paint']?.numericValue || 0,
+        largestContentfulPaint: audits['largest-contentful-paint']?.numericValue || 0,
+        firstInputDelay: audits['max-potential-fid']?.numericValue || 0,
       interactionToNextPaint: audits['interaction-to-next-paint']?.numericValue || 0,
-      cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue || 0,
-      speedIndex: audits['speed-index']?.numericValue || 0,
-      totalBlockingTime: audits['total-blocking-time']?.numericValue || 0,
-    };
+        cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue || 0,
+        speedIndex: audits['speed-index']?.numericValue || 0,
+        totalBlockingTime: audits['total-blocking-time']?.numericValue || 0,
+      };
 
     // Performance optimization opportunities
-    const opportunities = Object.entries(audits)
-      .filter(([key, audit]: [string, any]) => 
-        audit.scoreDisplayMode === 'numeric' && 
-        audit.numericValue > 0 && 
-        audit.details?.overallSavingsMs > 100
-      )
-      .map(([key, audit]: [string, any]) => ({
-        id: key,
-        title: audit.title,
-        description: audit.description,
-        savings: audit.details?.overallSavingsMs || 0,
-        displayValue: audit.displayValue || '',
-      }))
-      .sort((a, b) => b.savings - a.savings)
-      .slice(0, 10);
+      const opportunities = Object.entries(audits)
+        .filter(([key, audit]: [string, any]) => 
+          audit.scoreDisplayMode === 'numeric' && 
+          audit.numericValue > 0 && 
+          audit.details?.overallSavingsMs > 100
+        )
+        .map(([key, audit]: [string, any]) => ({
+          id: key,
+          title: audit.title,
+          description: audit.description,
+          savings: audit.details?.overallSavingsMs || 0,
+          displayValue: audit.displayValue || '',
+        }))
+        .sort((a, b) => b.savings - a.savings)
+        .slice(0, 10);
 
-    // Diagnostics
-    const diagnostics = Object.entries(audits)
-      .filter(([key, audit]: [string, any]) => 
-        audit.scoreDisplayMode === 'informative' && audit.displayValue
-      )
-      .map(([key, audit]: [string, any]) => ({
-        id: key,
-        title: audit.title,
-        description: audit.description,
-        displayValue: audit.displayValue,
-      }))
+      // Diagnostics
+      const diagnostics = Object.entries(audits)
+        .filter(([key, audit]: [string, any]) => 
+          audit.scoreDisplayMode === 'informative' && audit.displayValue
+        )
+        .map(([key, audit]: [string, any]) => ({
+          id: key,
+          title: audit.title,
+          description: audit.description,
+          displayValue: audit.displayValue,
+        }))
       .slice(0,8);
 
-    // Resource summary
-    const resourceSummary = {
-      totalSize: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
-        sum + (item.size || 0), 0) || 0,
-      imageSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-        item.resourceType === 'image')?.size || 0,
-      scriptSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-        item.resourceType === 'script')?.size || 0,
-      stylesheetSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-        item.resourceType === 'stylesheet')?.size || 0,
-      resourceCount: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
-        sum + (item.requestCount || 0), 0) || 0,
-    };
+      // Resource summary
+      const resourceSummary = {
+        totalSize: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
+          sum + (item.size || 0), 0) || 0,
+        imageSize: audits['resource-summary']?.details?.items?.find((item: any) => 
+          item.resourceType === 'image')?.size || 0,
+        scriptSize: audits['resource-summary']?.details?.items?.find((item: any) => 
+          item.resourceType === 'script')?.size || 0,
+        stylesheetSize: audits['resource-summary']?.details?.items?.find((item: any) => 
+          item.resourceType === 'stylesheet')?.size || 0,
+        resourceCount: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
+          sum + (item.requestCount || 0), 0) || 0,
+      };
 
     // Network requests for waterfall
     const networkRequests = (audits['network-requests']?.details?.items || []).map((item: any) => ({
@@ -374,24 +381,26 @@ export default function AccuratePerformanceAnalyzer() {
       .filter(Boolean);
     const finalScreenshot = audits['final-screenshot']?.details?.data || null;
 
-    return {
-      url: testUrl,
-      timestamp: Date.now(),
+    const result: PageSpeedMetrics = {
+        url: testUrl,
+        timestamp: Date.now(),
       device: strategy,
-      scores: {
-        performance: Math.round(categories.performance.score * 100),
-        accessibility: Math.round(categories.accessibility.score * 100),
-        bestPractices: Math.round(categories['best-practices'].score * 100),
-        seo: Math.round(categories.seo.score * 100),
-      },
-      metrics,
-      opportunities,
-      diagnostics,
-      resourceSummary,
-      loadingExperience: data.loadingExperience,
+        scores: {
+          performance: Math.round(categories.performance.score * 100),
+          accessibility: Math.round(categories.accessibility.score * 100),
+          bestPractices: Math.round(categories['best-practices'].score * 100),
+          seo: Math.round(categories.seo.score * 100),
+        },
+        metrics,
+        opportunities,
+        diagnostics,
+        resourceSummary,
+        loadingExperience: data.loadingExperience,
       networkRequests,
       screenshots: { thumbnails, final: finalScreenshot },
     };
+    analysisCacheRef.current.set(cacheKey, result);
+    return result;
   };
 
   const getScoreColor = (score: number): string => {
@@ -677,27 +686,37 @@ export default function AccuratePerformanceAnalyzer() {
     doc.save(`perfex-performance-report-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
-  const performanceScores = getPerformanceScores();
+  const performanceScores = useMemo(() => getPerformanceScores(), [results]);
   const overallScore = performanceScores.length > 0
     ? Math.round(performanceScores.reduce((sum, score) => sum + score.score, 0) / performanceScores.length)
     : 0;
-  const metricCards = getMetricCards();
+  const metricCards = useMemo(() => getMetricCards(), [results]);
 
-  const resourceData = results
-    ? [
+  const resourceData = useMemo(() => {
+    if (!results) return [] as Array<{ name: string; value: number; color: string }>;
+    const parts = [
         { name: "Images", value: results.resourceSummary.imageSize, color: "#8b5cf6" },
         { name: "Scripts", value: results.resourceSummary.scriptSize, color: "#06b6d4" },
         { name: "Styles", value: results.resourceSummary.stylesheetSize, color: "#10b981" },
-        {
-          name: "Other",
-          value: results.resourceSummary.totalSize - 
-                 results.resourceSummary.imageSize - 
-                 results.resourceSummary.scriptSize - 
-                 results.resourceSummary.stylesheetSize,
-          color: "#f59e0b"
-        },
-      ].filter(item => item.value > 0)
-    : [];
+    ];
+    const otherValue = Math.max(0, results.resourceSummary.totalSize - parts.reduce((s, p) => s + p.value, 0));
+    if (otherValue > 0) parts.push({ name: "Other", value: otherValue, color: "#f59e0b" });
+    return parts.filter(item => item.value > 0);
+  }, [results]);
+
+  const networkBarData = useMemo(() => {
+    if (!results?.networkRequests) return [] as Array<{ name: string; start: number; duration: number; size: number }>;
+    try {
+      return results.networkRequests.slice(0, 40).map((r) => ({
+        name: new URL(r.url).hostname.replace(/^www\./, ''),
+        start: r.startTime,
+        duration: Math.max(0, (r.endTime - r.startTime)),
+        size: r.transferSize,
+      }));
+    } catch {
+      return [] as Array<{ name: string; start: number; duration: number; size: number }>;
+    }
+  }, [results?.networkRequests]);
 
   const radialData = performanceScores.map((score) => ({
     ...score,
@@ -867,14 +886,14 @@ export default function AccuratePerformanceAnalyzer() {
 
               {/* Progress */}
               {isAnalyzing && (
-                <div className="space-y-4 bg-slate-800/30 rounded-xl p-6 border border-slate-700/30">
+                <div className="space-y-4 bg-slate-800/30 rounded-xl p-6 border border-slate-700/30" role="status" aria-live="polite" aria-busy={isAnalyzing}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg flex items-center justify-center animate-pulse">
                         <CheckCircle2 className="h-4 w-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-white font-medium">{currentStep}</p>
+                        <p className="text-white font-medium" aria-atomic="true">{currentStep}</p>
                         <p className="text-sm text-slate-400">Perfex Performance Engine</p>
                       </div>
                     </div>
@@ -1158,14 +1177,7 @@ export default function AccuratePerformanceAnalyzer() {
                           <h5 className="text-white font-semibold mb-4">Network Waterfall</h5>
                           <ResponsiveContainer width="100%" height={280}>
                             <BarChart
-                              data={results.networkRequests
-                                .slice(0, 40)
-                                .map((r) => ({
-                                  name: new URL(r.url).hostname.replace(/^www\./, ''),
-                                  start: r.startTime,
-                                  duration: Math.max(0, (r.endTime - r.startTime)),
-                                  size: r.transferSize,
-                                }))}
+                              data={networkBarData}
                               margin={{ left: 0, right: 0, top: 10, bottom: 10 }}
                             >
                               <XAxis dataKey="name" tick={false} axisLine={false} tickLine={false} />
@@ -1197,10 +1209,10 @@ export default function AccuratePerformanceAnalyzer() {
                           <h5 className="text-white font-semibold mb-4">Load Progress</h5>
                           <div className="flex items-center gap-3 overflow-x-auto pb-2">
                             {results.screenshots.thumbnails.map((src, idx) => (
-                              <img key={idx} src={src} alt={`thumbnail-${idx}`} className="h-24 rounded-lg border border-slate-700" />
+                              <Image key={idx} src={src} alt={`Load progress thumbnail ${idx + 1}`} width={160} height={96} className="h-24 w-auto rounded-lg border border-slate-700" />
                             ))}
                             {results.screenshots.final && (
-                              <img src={results.screenshots.final} alt="final" className="h-24 rounded-lg border border-slate-700" />
+                              <Image src={results.screenshots.final} alt="Final screenshot" width={160} height={96} className="h-24 w-auto rounded-lg border border-slate-700" />
                             )}
                           </div>
                         </div>
@@ -1471,10 +1483,10 @@ export default function AccuratePerformanceAnalyzer() {
                   {history.length > 1 ? (
                     <div className="space-y-8">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-xl font-bold text-white flex items-center space-x-2">
-                          <TrendingUp className="h-5 w-5 text-cyan-400" />
-                          <span>Performance History</span>
-                        </h4>
+                      <h4 className="text-xl font-bold text-white flex items-center space-x-2">
+                        <TrendingUp className="h-5 w-5 text-cyan-400" />
+                        <span>Performance History</span>
+                      </h4>
                         <Button
                           onClick={exportHistoryCSV}
                           className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25"
