@@ -14,6 +14,11 @@ import {
   PieChart,
   Pie,
   Cell,
+  RadarChart,
+  Radar,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
   RadialBarChart,
   RadialBar,
 } from "recharts";
@@ -88,6 +93,7 @@ interface PageSpeedMetrics {
     cumulativeLayoutShift: number;
     speedIndex: number;
     totalBlockingTime: number;
+    interactionToNextPaint: number;
   };
   opportunities: Array<{
     id: string;
@@ -109,6 +115,17 @@ interface PageSpeedMetrics {
     stylesheetSize: number;
     resourceCount: number;
   };
+  networkRequests?: Array<{
+    url: string;
+    transferSize: number;
+    startTime: number;
+    endTime: number;
+    resourceType?: string;
+  }>;
+  screenshots?: {
+    thumbnails: string[];
+    final?: string | null;
+  };
   loadingExperience?: {
     overall_category: string;
     metrics: {
@@ -116,8 +133,11 @@ interface PageSpeedMetrics {
       FIRST_CONTENTFUL_PAINT_MS?: { category: string; percentile: number };
       FIRST_INPUT_DELAY_MS?: { category: string; percentile: number };
       LARGEST_CONTENTFUL_PAINT_MS?: { category: string; percentile: number };
+      INTERACTION_TO_NEXT_PAINT_MS?: { category: string; percentile: number };
     };
   };
+  accessibilityFindings?: Array<{ id: string; title: string; description?: string; displayValue?: string }>;
+  seoFindings?: Array<{ id: string; title: string; description?: string; displayValue?: string }>;
 }
 
 interface ScoreData {
@@ -206,6 +226,7 @@ export default function AccuratePerformanceAnalyzer() {
         firstContentfulPaint: audits['first-contentful-paint']?.numericValue || 0,
         largestContentfulPaint: audits['largest-contentful-paint']?.numericValue || 0,
         firstInputDelay: audits['max-potential-fid']?.numericValue || 0,
+        interactionToNextPaint: audits['interaction-to-next-paint']?.numericValue || 0,
         cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue || 0,
         speedIndex: audits['speed-index']?.numericValue || 0,
         totalBlockingTime: audits['total-blocking-time']?.numericValue || 0,
@@ -255,6 +276,21 @@ export default function AccuratePerformanceAnalyzer() {
           sum + (item.requestCount || 0), 0) || 0,
       };
 
+      // Network requests for waterfall
+      const networkRequests = (audits['network-requests']?.details?.items || []).map((item: any) => ({
+        url: item.url,
+        transferSize: item.transferSize || item.resourceSize || 0,
+        startTime: item.startTimeMs ?? item.startTime ?? 0,
+        endTime: item.endTimeMs ?? item.endTime ?? ((item.startTimeMs ?? item.startTime ?? 0) + (item.durationMs ?? item.duration ?? 0)),
+        resourceType: item.resourceType,
+      }));
+
+      // Screenshot thumbnails and final screenshot
+      const thumbnails = (audits['screenshot-thumbnails']?.details?.items || [])
+        .map((it: any) => it.data)
+        .filter(Boolean);
+      const finalScreenshot = audits['final-screenshot']?.details?.data || null;
+
       const analysisResults: PageSpeedMetrics = {
         url: testUrl,
         timestamp: Date.now(),
@@ -270,6 +306,8 @@ export default function AccuratePerformanceAnalyzer() {
         diagnostics,
         resourceSummary,
         loadingExperience: data.loadingExperience,
+        networkRequests,
+        screenshots: { thumbnails, final: finalScreenshot },
       };
 
       setProgress(100);
@@ -368,6 +406,16 @@ export default function AccuratePerformanceAnalyzer() {
         description: "Time when main content finishes loading",
       },
       {
+        title: "Interaction to Next Paint",
+        value: formatTime(results.metrics.interactionToNextPaint || 0),
+        icon: <Zap className="h-5 w-5" />,
+        trend: (results.metrics.interactionToNextPaint || 0) < 200 ? "up" : 
+               (results.metrics.interactionToNextPaint || 0) <= 500 ? "neutral" : "down",
+        color: (results.metrics.interactionToNextPaint || 0) < 200 ? "text-emerald-400" :
+               (results.metrics.interactionToNextPaint || 0) <= 500 ? "text-amber-400" : "text-red-400",
+        description: "Interactivity latency for real user inputs",
+      },
+      {
         title: "Speed Index",
         value: formatTime(results.metrics.speedIndex),
         icon: <Activity className="h-5 w-5" />,
@@ -414,6 +462,7 @@ export default function AccuratePerformanceAnalyzer() {
         fcp: results.metrics.firstContentfulPaint,
         lcp: results.metrics.largestContentfulPaint,
         fid: results.metrics.firstInputDelay,
+        inp: results.metrics.interactionToNextPaint,
         cls: results.metrics.cumulativeLayoutShift,
       },
     };
@@ -754,7 +803,7 @@ export default function AccuratePerformanceAnalyzer() {
             <Card className="bg-slate-900/50 backdrop-blur-xl border-slate-700/50 shadow-2xl">
               <Tabs defaultValue="overview" className="w-full">
                 <div className="border-b border-slate-700/50 px-8 pt-6">
-                  <TabsList className="grid w-full grid-cols-5 bg-slate-800/30 p-1 rounded-xl">
+                  <TabsList className="grid w-full grid-cols-6 bg-slate-800/30 p-1 rounded-xl">
                     <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Scores
@@ -762,6 +811,10 @@ export default function AccuratePerformanceAnalyzer() {
                     <TabsTrigger value="vitals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
                       <Activity className="h-4 w-4 mr-2" />
                       Core Vitals
+                    </TabsTrigger>
+                    <TabsTrigger value="field-vs-lab" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
+                      <Gauge className="h-4 w-4 mr-2" />
+                      Field vs Lab
                     </TabsTrigger>
                     <TabsTrigger value="opportunities" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
                       <Target className="h-4 w-4 mr-2" />
@@ -844,7 +897,10 @@ export default function AccuratePerformanceAnalyzer() {
                                 ))}
                               </Pie>
                               <Tooltip
-                                formatter={(value) => [formatBytes(value), "Size"]}
+                                formatter={(value) => [
+                                  formatBytes(typeof value === 'number' ? value : Number(value)),
+                                  "Size"
+                                ]}
                                 contentStyle={{
                                   backgroundColor: "rgba(15, 23, 42, 0.9)",
                                   border: "1px solid rgba(148, 163, 184, 0.3)",
@@ -858,6 +914,60 @@ export default function AccuratePerformanceAnalyzer() {
                       ) : (
                         <div className="bg-slate-800/30 rounded-xl p-6 text-center">
                           <p className="text-slate-400">No resource data available</p>
+                        </div>
+                      )}
+
+                      {/* Resource Waterfall */}
+                      {results?.networkRequests && results.networkRequests.length > 0 && (
+                        <div className="bg-slate-800/30 rounded-xl p-6">
+                          <h5 className="text-white font-semibold mb-4">Network Waterfall</h5>
+                          <ResponsiveContainer width="100%" height={280}>
+                            <BarChart
+                              data={results.networkRequests
+                                .slice(0, 40)
+                                .map((r) => ({
+                                  name: new URL(r.url).hostname.replace(/^www\./, ''),
+                                  start: r.startTime,
+                                  duration: Math.max(0, (r.endTime - r.startTime)),
+                                  size: r.transferSize,
+                                }))}
+                              margin={{ left: 0, right: 0, top: 10, bottom: 10 }}
+                            >
+                              <XAxis dataKey="name" tick={false} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                              <Tooltip
+                                formatter={(value: any, key: any, item: any) => {
+                                  if (key === 'duration') return [formatTime(value), 'Duration'];
+                                  if (key === 'size') return [formatBytes(value), 'Transfer'];
+                                  return [value, key];
+                                }}
+                                contentStyle={{
+                                  backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                  border: '1px solid rgba(148, 163, 184, 0.3)',
+                                  borderRadius: '12px',
+                                  color: 'white',
+                                }}
+                              />
+                              <Legend />
+                              <Bar dataKey="duration" name="Duration" fill="#38bdf8" />
+                              <Bar dataKey="size" name="Transfer" fill="#22c55e" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {/* Screenshot Thumbnails */}
+                      {results?.screenshots && (results.screenshots.thumbnails.length > 0 || results.screenshots.final) && (
+                        <div className="bg-slate-800/30 rounded-xl p-6">
+                          <h5 className="text-white font-semibold mb-4">Load Progress</h5>
+                          <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                            {results.screenshots.thumbnails.map((src, idx) => (
+                              <img key={idx} src={src} alt={`thumbnail-${idx}`} className="h-24 rounded-lg border border-slate-700" />
+                            ))}
+                            {results.screenshots.final && (
+                              <img src={results.screenshots.final} alt="final" className="h-24 rounded-lg border border-slate-700" />
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -900,12 +1010,13 @@ export default function AccuratePerformanceAnalyzer() {
                           description: "Measures loading performance"
                         },
                         {
-                          title: "First Input Delay",
-                          value: formatTime(results.metrics.firstInputDelay || 0),
-                          threshold: "Good: < 100ms",
-                          status: (results.metrics.firstInputDelay || 0) <= 100 ? "good" :
-                                  (results.metrics.firstInputDelay || 0) <= 300 ? "needs-improvement" : "poor",
-                          description: "Measures interactivity"
+                          title: "Interaction to Next Paint",
+                          value: formatTime(results.metrics.interactionToNextPaint || 0),
+                          threshold: "Good: < 200ms",
+                          status: (results.metrics.interactionToNextPaint || 0) < 200 ? "good" :
+                                  (results.metrics.interactionToNextPaint || 0) <= 500 ? "needs-improvement" : "poor",
+                          description: "Measures interactivity (replaces FID)",
+                          note: "FID has been deprecated in favor of INP."
                         },
                         {
                           title: "Cumulative Layout Shift",
@@ -931,6 +1042,11 @@ export default function AccuratePerformanceAnalyzer() {
                                 <h5 className="font-semibold text-white mb-1">{vital.title}</h5>
                                 <p className="text-sm text-slate-400 mb-2">{vital.description}</p>
                                 <p className="text-xs text-slate-500">{vital.threshold}</p>
+                                {vital.title === 'Interaction to Next Paint' && (
+                                  <p className="text-xs mt-2 text-slate-500">
+                                    {"FID has been deprecated. INP better reflects real-user interactivity latency."}
+                                  </p>
+                                )}
                               </div>
                               <div className="text-right">
                                 <div className="text-2xl font-bold text-white mb-1">
@@ -1143,6 +1259,75 @@ export default function AccuratePerformanceAnalyzer() {
                       </p>
                     </div>
                   )}
+                </TabsContent>
+
+                {/* Field vs Lab Comparison */}
+                <TabsContent value="field-vs-lab" className="p-8">
+                  <div className="space-y-8">
+                    <h4 className="text-xl font-bold text-white flex items-center space-x-2">
+                      <Gauge className="h-5 w-5 text-cyan-400" />
+                      <span>Field (Real Users) vs Lab (Simulated)</span>
+                    </h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">Comparison (Lab vs Field P75)</h5>
+                        <ResponsiveContainer width="100%" height={320}>
+                          <BarChart
+                            data={["FCP","LCP","INP","CLS"].map((k) => {
+                              const lab = {
+                                FCP: results.metrics.firstContentfulPaint,
+                                LCP: results.metrics.largestContentfulPaint,
+                                INP: results.metrics.interactionToNextPaint || 0,
+                                CLS: (results.metrics.cumulativeLayoutShift || 0) * 1000, // scale for chart
+                              }[k as 'FCP'];
+                              const fieldMetrics = results.loadingExperience?.metrics || {} as any;
+                              const field = {
+                                FCP: fieldMetrics.FIRST_CONTENTFUL_PAINT_MS?.percentile || 0,
+                                LCP: fieldMetrics.LARGEST_CONTENTFUL_PAINT_MS?.percentile || 0,
+                                INP: fieldMetrics.INTERACTION_TO_NEXT_PAINT_MS?.percentile || 0,
+                                CLS: (fieldMetrics.CUMULATIVE_LAYOUT_SHIFT_SCORE?.percentile || 0) * 10, // visual scale
+                              }[k as 'FCP'];
+                              return { name: k, Lab: lab, Field: field };
+                            })}
+                          >
+                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ backgroundColor: 'rgba(15,23,42,0.95)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 12, color: '#fff' }} />
+                            <Legend />
+                            <Bar dataKey="Lab" fill="#60a5fa" />
+                            <Bar dataKey="Field" fill="#34d399" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">Vitals Radar</h5>
+                        <ResponsiveContainer width="100%" height={320}>
+                          <RadarChart
+                            data={["FCP","LCP","INP","CLS","TBT"].map((k) => ({
+                              metric: k,
+                              value: {
+                                FCP: Math.min(1, 1800 / Math.max(1, results.metrics.firstContentfulPaint)),
+                                LCP: Math.min(1, 2500 / Math.max(1, results.metrics.largestContentfulPaint)),
+                                INP: Math.min(1, 200 / Math.max(1, results.metrics.interactionToNextPaint || 1)),
+                                CLS: Math.min(1, 0.1 / Math.max(0.001, results.metrics.cumulativeLayoutShift)),
+                                TBT: Math.min(1, 200 / Math.max(1, results.metrics.totalBlockingTime)),
+                              }[k as 'FCP']
+                            }))}
+                            outerRadius={120}
+                          >
+                            <PolarGrid />
+                            <PolarAngleAxis dataKey="metric" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                            <PolarRadiusAxis angle={30} domain={[0, 1]} tick={false} />
+                            <Radar name="Score" dataKey="value" stroke="#22c55e" fill="#22c55e" fillOpacity={0.5} />
+                            <Legend />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    {!results.loadingExperience && (
+                      <p className="text-sm text-slate-400">Field data not available for this URL.</p>
+                    )}
+                  </div>
                 </TabsContent>
               </Tabs>
             </Card>
