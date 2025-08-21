@@ -22,6 +22,7 @@ import {
   RadialBarChart,
   RadialBar,
 } from "recharts";
+import jsPDF from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -173,9 +174,48 @@ export default function AccuratePerformanceAnalyzer() {
   const [history, setHistory] = useState<PageSpeedMetrics[]>([]);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
+  const [compareMode, setCompareMode] = useState(false);
+  const [desktopResults, setDesktopResults] = useState<PageSpeedMetrics | null>(null);
+  const [mobileResults, setMobileResults] = useState<PageSpeedMetrics | null>(null);
+  const [benchmarkUrls, setBenchmarkUrls] = useState<string[]>(["", "", ""]);
+  const [benchmarkResults, setBenchmarkResults] = useState<PageSpeedMetrics[]>([]);
+  const [implementedOpportunities, setImplementedOpportunities] = useState<Set<string>>(new Set());
 
   const PAGESPEED_API_KEY = process.env.NEXT_PUBLIC_PAGESPEED_API_KEY || ''; // Add your API key here
   const PAGESPEED_API_BASE = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
+
+  // Load history and implemented opportunities from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('pagespeed-history');
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (error) {
+        console.error('Failed to parse saved history:', error);
+      }
+    }
+
+    const savedOpportunities = localStorage.getItem('implemented-opportunities');
+    if (savedOpportunities) {
+      try {
+        setImplementedOpportunities(new Set(JSON.parse(savedOpportunities)));
+      } catch (error) {
+        console.error('Failed to parse saved opportunities:', error);
+      }
+    }
+  }, []);
+
+  // Save history to localStorage whenever it changes
+  useEffect(() => {
+    if (history.length > 0) {
+      localStorage.setItem('pagespeed-history', JSON.stringify(history));
+    }
+  }, [history]);
+
+  // Save implemented opportunities to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('implemented-opportunities', JSON.stringify(Array.from(implementedOpportunities)));
+  }, [implementedOpportunities]);
 
   const analyzeWebsite = async () => {
     if (!url) return;
@@ -183,139 +223,45 @@ export default function AccuratePerformanceAnalyzer() {
     setIsAnalyzing(true);
     setError(null);
     setProgress(0);
-    setCurrentStep("Initializing PageSpeed Insights analysis...");
+    setCurrentStep(compareMode ? "Initializing dual-device analysis..." : "Initializing PageSpeed Insights analysis...");
 
     try {
       const testUrl = url.startsWith("http") ? url : `https://${url}`;
       new URL(testUrl);
 
       setProgress(15);
-      setCurrentStep("Connecting to Google PageSpeed Insights...");
-
-      const strategy = device === "mobile" ? "mobile" : "desktop";
-      const apiUrl = `${PAGESPEED_API_BASE}?url=${encodeURIComponent(testUrl)}&strategy=${strategy}&category=performance&category=accessibility&category=best-practices&category=seo${PAGESPEED_API_KEY ? `&key=${PAGESPEED_API_KEY}` : ''}`;
-
-      setProgress(35);
-      setCurrentStep("Running comprehensive performance audit...");
-
-      const response = await fetch(apiUrl);
+      setCurrentStep(compareMode ? "Connecting to Google PageSpeed Insights..." : "Connecting to Google PageSpeed Insights...");
       
-      if (!response.ok) {
-        throw new Error(`PageSpeed API Error: ${response.status} - ${response.statusText}`);
+      if (compareMode) {
+        // Run both desktop and mobile analysis
+        setCurrentStep("Running desktop analysis...");
+        const desktopData = await runSingleAnalysis(testUrl, "desktop");
+        setProgress(50);
+        
+        setCurrentStep("Running mobile analysis...");
+        const mobileData = await runSingleAnalysis(testUrl, "mobile");
+        setProgress(85);
+        
+        setCurrentStep("Processing comparison results...");
+        setDesktopResults(desktopData);
+        setMobileResults(mobileData);
+        setResults(desktopData); // Set main results to desktop for compatibility
+        setHistory((prev) => [desktopData, mobileData, ...prev.slice(0, 8)]);
+      } else {
+        // Run single device analysis
+        const strategy = device === "mobile" ? "mobile" : "desktop";
+        const analysisResults = await runSingleAnalysis(testUrl, strategy);
+        setResults(analysisResults);
+        setHistory((prev) => [analysisResults, ...prev.slice(0, 9)]);
       }
-
-      setProgress(65);
-      setCurrentStep("Processing audit results...");
-
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(`PageSpeed Analysis Failed: ${data.error.message}`);
-      }
-
-      setProgress(85);
-      setCurrentStep("Analyzing performance metrics...");
-
-      // Extract metrics from PageSpeed response
-      const lighthouseResult = data.lighthouseResult;
-      const categories = lighthouseResult.categories;
-      const audits = lighthouseResult.audits;
-
-      // Core Web Vitals and other metrics
-      const metrics = {
-        firstContentfulPaint: audits['first-contentful-paint']?.numericValue || 0,
-        largestContentfulPaint: audits['largest-contentful-paint']?.numericValue || 0,
-        firstInputDelay: audits['max-potential-fid']?.numericValue || 0,
-        interactionToNextPaint: audits['interaction-to-next-paint']?.numericValue || 0,
-        cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue || 0,
-        speedIndex: audits['speed-index']?.numericValue || 0,
-        totalBlockingTime: audits['total-blocking-time']?.numericValue || 0,
-      };
-
-      // Performance opportunities
-      const opportunities = Object.entries(audits)
-        .filter(([key, audit]: [string, any]) => 
-          audit.scoreDisplayMode === 'numeric' && 
-          audit.numericValue > 0 && 
-          audit.details?.overallSavingsMs > 100
-        )
-        .map(([key, audit]: [string, any]) => ({
-          id: key,
-          title: audit.title,
-          description: audit.description,
-          savings: audit.details?.overallSavingsMs || 0,
-          displayValue: audit.displayValue || '',
-        }))
-        .sort((a, b) => b.savings - a.savings)
-        .slice(0, 10);
-
-      // Diagnostics
-      const diagnostics = Object.entries(audits)
-        .filter(([key, audit]: [string, any]) => 
-          audit.scoreDisplayMode === 'informative' && audit.displayValue
-        )
-        .map(([key, audit]: [string, any]) => ({
-          id: key,
-          title: audit.title,
-          description: audit.description,
-          displayValue: audit.displayValue,
-        }))
-        .slice(0, 8);
-
-      // Resource summary
-      const resourceSummary = {
-        totalSize: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
-          sum + (item.size || 0), 0) || 0,
-        imageSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-          item.resourceType === 'image')?.size || 0,
-        scriptSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-          item.resourceType === 'script')?.size || 0,
-        stylesheetSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-          item.resourceType === 'stylesheet')?.size || 0,
-        resourceCount: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
-          sum + (item.requestCount || 0), 0) || 0,
-      };
-
-      // Network requests for waterfall
-      const networkRequests = (audits['network-requests']?.details?.items || []).map((item: any) => ({
-        url: item.url,
-        transferSize: item.transferSize || item.resourceSize || 0,
-        startTime: item.startTimeMs ?? item.startTime ?? 0,
-        endTime: item.endTimeMs ?? item.endTime ?? ((item.startTimeMs ?? item.startTime ?? 0) + (item.durationMs ?? item.duration ?? 0)),
-        resourceType: item.resourceType,
-      }));
-
-      // Screenshot thumbnails and final screenshot
-      const thumbnails = (audits['screenshot-thumbnails']?.details?.items || [])
-        .map((it: any) => it.data)
-        .filter(Boolean);
-      const finalScreenshot = audits['final-screenshot']?.details?.data || null;
-
-      const analysisResults: PageSpeedMetrics = {
-        url: testUrl,
-        timestamp: Date.now(),
-        device,
-        scores: {
-          performance: Math.round(categories.performance.score * 100),
-          accessibility: Math.round(categories.accessibility.score * 100),
-          bestPractices: Math.round(categories['best-practices'].score * 100),
-          seo: Math.round(categories.seo.score * 100),
-        },
-        metrics,
-        opportunities,
-        diagnostics,
-        resourceSummary,
-        loadingExperience: data.loadingExperience,
-        networkRequests,
-        screenshots: { thumbnails, final: finalScreenshot },
-      };
 
       setProgress(100);
       setCurrentStep("Analysis complete - real data ready!");
       
       setTimeout(() => {
-        setResults(analysisResults);
-        setHistory((prev) => [analysisResults, ...prev.slice(0, 9)]);
+        setIsAnalyzing(false);
+        setProgress(0);
+        setCurrentStep("");
       }, 500);
 
     } catch (err: any) {
@@ -336,6 +282,116 @@ export default function AccuratePerformanceAnalyzer() {
       setProgress(0);
       setCurrentStep("");
     }
+  };
+
+  const runSingleAnalysis = async (testUrl: string, strategy: "desktop" | "mobile"): Promise<PageSpeedMetrics> => {
+    const apiUrl = `${PAGESPEED_API_BASE}?url=${encodeURIComponent(testUrl)}&strategy=${strategy}&category=performance&category=accessibility&category=best-practices&category=seo${PAGESPEED_API_KEY ? `&key=${PAGESPEED_API_KEY}` : ''}`;
+
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      throw new Error(`PageSpeed API Error: ${response.status} - ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(`PageSpeed Analysis Failed: ${data.error.message}`);
+    }
+
+    // Extract metrics from PageSpeed response
+    const lighthouseResult = data.lighthouseResult;
+    const categories = lighthouseResult.categories;
+    const audits = lighthouseResult.audits;
+
+    // Core Web Vitals and other metrics
+    const metrics = {
+      firstContentfulPaint: audits['first-contentful-paint']?.numericValue || 0,
+      largestContentfulPaint: audits['largest-contentful-paint']?.numericValue || 0,
+      firstInputDelay: audits['max-potential-fid']?.numericValue || 0,
+      interactionToNextPaint: audits['interaction-to-next-paint']?.numericValue || 0,
+      cumulativeLayoutShift: audits['cumulative-layout-shift']?.numericValue || 0,
+      speedIndex: audits['speed-index']?.numericValue || 0,
+      totalBlockingTime: audits['total-blocking-time']?.numericValue || 0,
+    };
+
+    // Performance opportunities
+    const opportunities = Object.entries(audits)
+      .filter(([key, audit]: [string, any]) => 
+        audit.scoreDisplayMode === 'numeric' && 
+        audit.numericValue > 0 && 
+        audit.details?.overallSavingsMs > 100
+      )
+      .map(([key, audit]: [string, any]) => ({
+        id: key,
+        title: audit.title,
+        description: audit.description,
+        savings: audit.details?.overallSavingsMs || 0,
+        displayValue: audit.displayValue || '',
+      }))
+      .sort((a, b) => b.savings - a.savings)
+      .slice(0, 10);
+
+    // Diagnostics
+    const diagnostics = Object.entries(audits)
+      .filter(([key, audit]: [string, any]) => 
+        audit.scoreDisplayMode === 'informative' && audit.displayValue
+      )
+      .map(([key, audit]: [string, any]) => ({
+        id: key,
+        title: audit.title,
+        description: audit.description,
+        displayValue: audit.displayValue,
+      }))
+      .slice(0,8);
+
+    // Resource summary
+    const resourceSummary = {
+      totalSize: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
+        sum + (item.size || 0), 0) || 0,
+      imageSize: audits['resource-summary']?.details?.items?.find((item: any) => 
+        item.resourceType === 'image')?.size || 0,
+      scriptSize: audits['resource-summary']?.details?.items?.find((item: any) => 
+        item.resourceType === 'stylesheet')?.size || 0,
+      stylesheetSize: audits['resource-summary']?.details?.items?.find((item: any) => 
+        item.resourceType === 'stylesheet')?.size || 0,
+      resourceCount: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
+        sum + (item.requestCount || 0), 0) || 0,
+    };
+
+    // Network requests for waterfall
+    const networkRequests = (audits['network-requests']?.details?.items || []).map((item: any) => ({
+      url: item.url,
+      transferSize: item.transferSize || item.resourceSize || 0,
+      startTime: item.startTimeMs ?? item.startTime ?? 0,
+      endTime: item.endTimeMs ?? item.endTime ?? ((item.startTimeMs ?? item.startTime ?? 0) + (item.durationMs ?? item.duration ?? 0)),
+      resourceType: item.resourceType,
+    }));
+
+    // Screenshot thumbnails and final screenshot
+    const thumbnails = (audits['screenshot-thumbnails']?.details?.items || [])
+      .map((it: any) => it.data)
+      .filter(Boolean);
+    const finalScreenshot = audits['final-screenshot']?.details?.data || null;
+
+    return {
+      url: testUrl,
+      timestamp: Date.now(),
+      device: strategy,
+      scores: {
+        performance: Math.round(categories.performance.score * 100),
+        accessibility: Math.round(categories.accessibility.score * 100),
+        bestPractices: Math.round(categories['best-practices'].score * 100),
+        seo: Math.round(categories.seo.score * 100),
+      },
+      metrics,
+      opportunities,
+      diagnostics,
+      resourceSummary,
+      loadingExperience: data.loadingExperience,
+      networkRequests,
+      screenshots: { thumbnails, final: finalScreenshot },
+    };
   };
 
   const getScoreColor = (score: number): string => {
@@ -475,6 +531,150 @@ export default function AccuratePerformanceAnalyzer() {
     a.download = `pagespeed-insights-report-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportHistoryCSV = () => {
+    if (history.length === 0) return;
+
+    const headers = [
+      "Date",
+      "Device",
+      "Performance Score",
+      "Accessibility Score",
+      "Best Practices Score",
+      "SEO Score",
+      "FCP (ms)",
+      "LCP (ms)",
+      "INP (ms)",
+      "CLS",
+      "Speed Index (ms)",
+      "Total Blocking Time (ms)"
+    ];
+
+    const csvData = history.map(record => [
+      new Date(record.timestamp).toLocaleDateString(),
+      record.device,
+      record.scores.performance,
+      record.scores.accessibility,
+      record.scores.bestPractices,
+      record.scores.seo,
+      record.metrics.firstContentfulPaint,
+      record.metrics.largestContentfulPaint,
+      record.metrics.interactionToNextPaint || 0,
+      record.metrics.cumulativeLayoutShift,
+      record.metrics.speedIndex,
+      record.metrics.totalBlockingTime
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pagespeed-history-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = () => {
+    if (!results) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - (2 * margin);
+    let yPosition = 20;
+
+    // Title
+    doc.setFontSize(24);
+    doc.setTextColor(33, 33, 33);
+    doc.text("PageSpeed Insights Report", margin, yPosition);
+    yPosition += 15;
+
+    // URL and Date
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`URL: ${results.url}`, margin, yPosition);
+    yPosition += 8;
+    doc.text(`Analysis Date: ${new Date(results.timestamp).toLocaleDateString()}`, margin, yPosition);
+    yPosition += 8;
+    doc.text(`Device: ${results.device}`, margin, yPosition);
+    yPosition += 20;
+
+    // Performance Scores
+    doc.setFontSize(16);
+    doc.setTextColor(33, 33, 33);
+    doc.text("Performance Scores", margin, yPosition);
+    yPosition += 10;
+
+    const scores = [
+      { name: "Performance", score: results.scores.performance },
+      { name: "Accessibility", score: results.scores.accessibility },
+      { name: "Best Practices", score: results.scores.bestPractices },
+      { name: "SEO", score: results.scores.seo }
+    ];
+
+    scores.forEach(score => {
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text(`${score.name}:`, margin, yPosition);
+      doc.setTextColor(score.score >= 90 ? 34 : score.score >= 50 ? 245 : 239, 
+                      score.score >= 90 ? 197 : score.score >= 50 ? 158 : 68, 
+                      score.score >= 90 ? 94 : score.score >= 50 ? 11 : 68);
+      doc.text(`${score.score}/100`, margin + 80, yPosition);
+      yPosition += 8;
+    });
+
+    yPosition += 10;
+
+    // Core Web Vitals
+    doc.setFontSize(16);
+    doc.setTextColor(33, 33, 33);
+    doc.text("Core Web Vitals", margin, yPosition);
+    yPosition += 10;
+
+    const vitals = [
+      { name: "LCP", value: formatTime(results.metrics.largestContentfulPaint), threshold: "Good: < 2.5s" },
+      { name: "INP", value: formatTime(results.metrics.interactionToNextPaint || 0), threshold: "Good: < 200ms" },
+      { name: "CLS", value: results.metrics.cumulativeLayoutShift.toFixed(3), threshold: "Good: < 0.1" },
+      { name: "FCP", value: formatTime(results.metrics.firstContentfulPaint), threshold: "Good: < 1.8s" }
+    ];
+
+    vitals.forEach(vital => {
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text(`${vital.name}: ${vital.value}`, margin, yPosition);
+      doc.setTextColor(100, 100, 100);
+      doc.text(vital.threshold, margin + 80, yPosition);
+      yPosition += 8;
+    });
+
+    yPosition += 10;
+
+    // Opportunities
+    if (results.opportunities.length > 0) {
+      doc.setFontSize(16);
+      doc.setTextColor(33, 33, 33);
+      doc.text("Optimization Opportunities", margin, yPosition);
+      yPosition += 10;
+
+      results.opportunities.slice(0, 5).forEach(opportunity => {
+        doc.setFontSize(11);
+        doc.setTextColor(33, 33, 33);
+        doc.text(opportunity.title, margin, yPosition);
+        yPosition += 6;
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Potential savings: ${formatTime(opportunity.savings)}`, margin + 10, yPosition);
+        yPosition += 6;
+      });
+    }
+
+    // Save PDF
+    doc.save(`pagespeed-report-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   const performanceScores = getPerformanceScores();
@@ -642,6 +842,29 @@ export default function AccuratePerformanceAnalyzer() {
                 </div>
               </div>
 
+              {/* Comparison Mode Toggle */}
+              <div className="flex items-center space-x-3 pt-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="compareMode"
+                    checked={compareMode}
+                    onChange={(e) => setCompareMode(e.target.checked)}
+                    className="w-4 h-4 text-green-600 bg-slate-800 border-slate-600 rounded focus:ring-green-500 focus:ring-2"
+                  />
+                  <label htmlFor="compareMode" className="text-sm text-slate-300">
+                    Compare Mobile vs Desktop
+                  </label>
+                </div>
+                {compareMode && (
+                  <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                    <Monitor className="h-3 w-3 mr-1" />
+                    <Smartphone className="h-3 w-3 mr-1" />
+                    Dual Analysis
+                  </Badge>
+                )}
+              </div>
+
               {/* Progress */}
               {isAnalyzing && (
                 <div className="space-y-4 bg-slate-800/30 rounded-xl p-6 border border-slate-700/30">
@@ -803,7 +1026,7 @@ export default function AccuratePerformanceAnalyzer() {
             <Card className="bg-slate-900/50 backdrop-blur-xl border-slate-700/50 shadow-2xl">
               <Tabs defaultValue="overview" className="w-full">
                 <div className="border-b border-slate-700/50 px-8 pt-6">
-                  <TabsList className="grid w-full grid-cols-6 bg-slate-800/30 p-1 rounded-xl">
+                  <TabsList className="grid w-full grid-cols-9 bg-slate-800/30 p-1 rounded-xl">
                     <TabsTrigger value="overview" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Scores
@@ -815,6 +1038,18 @@ export default function AccuratePerformanceAnalyzer() {
                     <TabsTrigger value="field-vs-lab" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
                       <Gauge className="h-4 w-4 mr-2" />
                       Field vs Lab
+                    </TabsTrigger>
+                    <TabsTrigger value="benchmark" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
+                      <Target className="h-4 w-4 mr-2" />
+                      Benchmark
+                    </TabsTrigger>
+                    <TabsTrigger value="accessibility" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
+                      <Shield className="h-4 w-4 mr-2" />
+                      Accessibility
+                    </TabsTrigger>
+                    <TabsTrigger value="seo" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
+                      <Star className="h-4 w-4 mr-2" />
+                      SEO
                     </TabsTrigger>
                     <TabsTrigger value="opportunities" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg">
                       <Target className="h-4 w-4 mr-2" />
@@ -1083,13 +1318,89 @@ export default function AccuratePerformanceAnalyzer() {
                             <CardContent className="p-6">
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 pr-4">
-                                  <h5 className="font-semibold text-white mb-2">{opportunity.title}</h5>
+                                  <div className="flex items-center space-x-3 mb-2">
+                                    <h5 className="font-semibold text-white">{opportunity.title}</h5>
+                                    <Badge 
+                                      className={`${
+                                        implementedOpportunities.has(opportunity.id)
+                                          ? "bg-green-500/20 text-green-300 border-green-500/30"
+                                          : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                      }`}
+                                    >
+                                      {implementedOpportunities.has(opportunity.id) ? "Implemented" : "Pending"}
+                                    </Badge>
+                                  </div>
                                   <p className="text-sm text-slate-400 leading-relaxed mb-3">
                                     {opportunity.description}
                                   </p>
                                   {opportunity.displayValue && (
                                     <p className="text-xs text-slate-500">{opportunity.displayValue}</p>
                                   )}
+                                  
+                                  {/* Fix Guide Accordion */}
+                                  <Accordion type="single" collapsible className="mt-4">
+                                    <AccordionItem value="fix-guide" className="border-slate-600/30">
+                                      <AccordionTrigger className="text-sm text-amber-300 hover:text-amber-200">
+                                        <Target className="h-4 w-4 mr-2" />
+                                        View Fix Guide
+                                      </AccordionTrigger>
+                                      <AccordionContent className="text-sm text-slate-300">
+                                        <div className="space-y-3 pt-2">
+                                          <div className="bg-slate-700/30 rounded-lg p-3">
+                                            <h6 className="font-medium text-white mb-2">Implementation Steps:</h6>
+                                            <ul className="list-disc list-inside space-y-1 text-xs">
+                                              <li>Review the specific audit details</li>
+                                              <li>Implement the suggested optimizations</li>
+                                              <li>Test changes in development environment</li>
+                                              <li>Deploy to production</li>
+                                              <li>Re-run analysis to verify improvements</li>
+                                            </ul>
+                                          </div>
+                                          <div className="flex items-center space-x-3">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                const newImplemented = new Set(implementedOpportunities);
+                                                if (newImplemented.has(opportunity.id)) {
+                                                  newImplemented.delete(opportunity.id);
+                                                } else {
+                                                  newImplemented.add(opportunity.id);
+                                                }
+                                                setImplementedOpportunities(newImplemented);
+                                              }}
+                                              className={`${
+                                                implementedOpportunities.has(opportunity.id)
+                                                  ? "border-green-500 text-green-300 hover:bg-green-500/20"
+                                                  : "border-amber-500 text-amber-300 hover:bg-amber-500/20"
+                                              }`}
+                                            >
+                                              {implementedOpportunities.has(opportunity.id) ? (
+                                                <>
+                                                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                                                  Mark as Pending
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                                                  Mark as Implemented
+                                                </>
+                                              )}
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => window.open(`https://pagespeed.web.dev/report?url=${encodeURIComponent(results.url)}`, "_blank")}
+                                              className="border-blue-500 text-blue-300 hover:bg-blue-500/20"
+                                            >
+                                              <ExternalLink className="h-4 w-4 mr-1" />
+                                              View Details
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </AccordionContent>
+                                    </AccordionItem>
+                                  </Accordion>
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                   <div className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-lg mb-2">
@@ -1159,10 +1470,19 @@ export default function AccuratePerformanceAnalyzer() {
                 <TabsContent value="history" className="p-8">
                   {history.length > 1 ? (
                     <div className="space-y-8">
-                      <h4 className="text-xl font-bold text-white flex items-center space-x-2">
-                        <TrendingUp className="h-5 w-5 text-cyan-400" />
-                        <span>Performance History</span>
-                      </h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xl font-bold text-white flex items-center space-x-2">
+                          <TrendingUp className="h-5 w-5 text-cyan-400" />
+                          <span>Performance History</span>
+                        </h4>
+                        <Button
+                          onClick={exportHistoryCSV}
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Export CSV
+                        </Button>
+                      </div>
 
                       <div className="bg-slate-800/30 rounded-xl p-6">
                         <ResponsiveContainer width="100%" height={300}>
@@ -1196,6 +1516,67 @@ export default function AccuratePerformanceAnalyzer() {
                               strokeWidth={3}
                               dot={{ fill: "#22c55e", strokeWidth: 2, r: 5 }}
                               activeDot={{ r: 8, fill: "#16a34a" }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Multi-Metric History Chart */}
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">Core Web Vitals Trends</h5>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={history.slice().reverse()}>
+                            <XAxis
+                              dataKey="timestamp"
+                              tickFormatter={(ts) => new Date(ts).toLocaleDateString()}
+                              tick={{ fontSize: 12, fill: "#94a3b8" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 12, fill: "#94a3b8" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              labelFormatter={(ts) => new Date(ts).toLocaleString()}
+                              formatter={(value: any, name: any) => {
+                                if (name === 'LCP') return [formatTime(value), 'LCP'];
+                                if (name === 'INP') return [formatTime(value), 'INP'];
+                                if (name === 'FCP') return [formatTime(value), 'FCP'];
+                                return [value, name];
+                              }}
+                              contentStyle={{
+                                backgroundColor: "rgba(15, 23, 42, 0.95)",
+                                border: "1px solid rgba(148, 163, 184, 0.3)",
+                                borderRadius: "12px",
+                                color: "white",
+                              }}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="metrics.largestContentfulPaint"
+                              name="LCP"
+                              stroke="#3b82f6"
+                              strokeWidth={2}
+                              dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="metrics.interactionToNextPaint"
+                              name="INP"
+                              stroke="#8b5cf6"
+                              strokeWidth={2}
+                              dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 4 }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="metrics.firstContentfulPaint"
+                              name="FCP"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
                             />
                           </LineChart>
                         </ResponsiveContainer>
@@ -1235,6 +1616,12 @@ export default function AccuratePerformanceAnalyzer() {
                                     <span className="text-sm text-slate-400">LCP</span>
                                     <span className="font-semibold text-white">
                                       {formatTime(record.metrics.largestContentfulPaint)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-slate-400">INP</span>
+                                    <span className="font-semibold text-white">
+                                      {formatTime(record.metrics.interactionToNextPaint || 0)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
@@ -1329,6 +1716,323 @@ export default function AccuratePerformanceAnalyzer() {
                     )}
                   </div>
                 </TabsContent>
+
+                {/* Competitor Benchmarking */}
+                <TabsContent value="benchmark" className="p-8">
+                  <div className="space-y-8">
+                    <h4 className="text-xl font-bold text-white flex items-center space-x-2">
+                      <Target className="h-5 w-5 text-amber-400" />
+                      <span>Competitor Benchmarking</span>
+                    </h4>
+                    
+                    <div className="bg-slate-800/30 rounded-xl p-6">
+                      <h5 className="text-white font-semibold mb-4">Compare Multiple URLs</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        {benchmarkUrls.map((url, index) => (
+                          <div key={index} className="space-y-2">
+                            <label className="text-sm text-slate-300">URL {index + 1}</label>
+                            <Input
+                              type="url"
+                              placeholder={`https://example${index + 1}.com`}
+                              value={url}
+                              onChange={(e) => {
+                                const newUrls = [...benchmarkUrls];
+                                newUrls[index] = e.target.value;
+                                setBenchmarkUrls(newUrls);
+                              }}
+                              className="bg-slate-700/50 border-slate-600/50 focus:border-amber-500 text-white placeholder-slate-400"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <Button
+                        onClick={async () => {
+                          const validUrls = benchmarkUrls.filter(url => url.trim());
+                          if (validUrls.length === 0) return;
+                          
+                          setBenchmarkResults([]);
+                          for (const url of validUrls) {
+                            try {
+                              const result = await runSingleAnalysis(url, "mobile");
+                              setBenchmarkResults(prev => [...prev, result]);
+                            } catch (error) {
+                              console.error(`Failed to analyze ${url}:`, error);
+                            }
+                          }
+                        }}
+                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white border-0 shadow-lg shadow-amber-500/25"
+                      >
+                        <Target className="h-4 w-4 mr-2" />
+                        Run Benchmark
+                      </Button>
+                    </div>
+
+                    {/* Benchmark Results */}
+                    {benchmarkResults.length > 0 && (
+                      <div className="space-y-6">
+                        <h5 className="text-white font-semibold">Benchmark Results</h5>
+                        
+                        {/* Performance Scores Comparison */}
+                        <div className="bg-slate-800/30 rounded-xl p-6">
+                          <h6 className="text-white font-medium mb-4">Performance Scores</h6>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart
+                              data={benchmarkResults.map(result => ({
+                                name: new URL(result.url).hostname.replace(/^www\./, ''),
+                                Performance: result.scores.performance,
+                                Accessibility: result.scores.accessibility,
+                                'Best Practices': result.scores.bestPractices,
+                                SEO: result.scores.seo,
+                              }))}
+                            >
+                              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                              <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                              <Tooltip contentStyle={{ backgroundColor: 'rgba(15,23,42,0.95)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 12, color: '#fff' }} />
+                              <Legend />
+                              <Bar dataKey="Performance" fill="#22c55e" />
+                              <Bar dataKey="Accessibility" fill="#3b82f6" />
+                              <Bar dataKey="Best Practices" fill="#8b5cf6" />
+                              <Bar dataKey="SEO" fill="#f59e0b" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* Core Web Vitals Comparison */}
+                        <div className="bg-slate-800/30 rounded-xl p-6">
+                          <h6 className="text-white font-medium mb-4">Core Web Vitals</h6>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart
+                              data={benchmarkResults.map(result => ({
+                                name: new URL(result.url).hostname.replace(/^www\./, ''),
+                                LCP: result.metrics.largestContentfulPaint,
+                                INP: result.metrics.interactionToNextPaint || 0,
+                                CLS: result.metrics.cumulativeLayoutShift * 1000, // scale for visibility
+                              }))}
+                            >
+                              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                              <Tooltip
+                                formatter={(value: any, name: any) => {
+                                  if (name === 'LCP' || name === 'INP') return [formatTime(value), name];
+                                  if (name === 'CLS') return [(value / 1000).toFixed(3), 'CLS'];
+                                  return [value, name];
+                                }}
+                                contentStyle={{ backgroundColor: 'rgba(15,23,42,0.95)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 12, color: '#fff' }}
+                              />
+                              <Legend />
+                              <Bar dataKey="LCP" fill="#3b82f6" />
+                              <Bar dataKey="INP" fill="#8b5cf6" />
+                              <Bar dataKey="CLS" fill="#f59e0b" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Accessibility Deep Dive */}
+                <TabsContent value="accessibility" className="p-8">
+                  <div className="space-y-8">
+                    <h4 className="text-xl font-bold text-white flex items-center space-x-2">
+                      <Shield className="h-5 w-5 text-green-400" />
+                      <span>Accessibility Analysis</span>
+                      <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                        {results.scores.accessibility}/100
+                      </Badge>
+                    </h4>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Accessibility Score Breakdown */}
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">Accessibility Score</h5>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-300">Overall Score</span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{results.scores.accessibility}</span>
+                              <Badge className={`${
+                                results.scores.accessibility >= 90 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                                results.scores.accessibility >= 50 ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                                "bg-red-500/20 text-red-300 border-red-500/30"
+                              }`}>
+                                {results.scores.accessibility >= 90 ? "Excellent" :
+                                 results.scores.accessibility >= 50 ? "Good" : "Needs Work"}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="w-full bg-slate-700 rounded-full h-3">
+                            <div
+                              className="h-3 rounded-full transition-all duration-1000"
+                              style={{
+                                width: `${results.scores.accessibility}%`,
+                                backgroundColor: getScoreColor(results.scores.accessibility),
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Key Accessibility Areas */}
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">Key Areas</h5>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Palette className="h-4 w-4 text-blue-400" />
+                              <span className="text-sm text-slate-300">Color Contrast</span>
+                            </div>
+                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">Critical</Badge>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Code className="h-4 w-4 text-purple-400" />
+                              <span className="text-sm text-slate-300">Semantic HTML</span>
+                            </div>
+                            <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">Important</Badge>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Eye className="h-4 w-4 text-green-400" />
+                              <span className="text-sm text-slate-300">Screen Reader</span>
+                            </div>
+                            <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Good</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Accessibility Recommendations */}
+                    <div className="bg-slate-800/30 rounded-xl p-6">
+                      <h5 className="text-white font-semibold mb-4">Recommendations</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3 p-3 bg-slate-700/30 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 mt-1" />
+                          <div>
+                            <p className="text-sm text-white font-medium">Ensure sufficient color contrast</p>
+                            <p className="text-xs text-slate-400">Text should have a contrast ratio of at least 4.5:1 for normal text</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3 p-3 bg-slate-700/30 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 mt-1" />
+                          <div>
+                            <p className="text-sm text-white font-medium">Use semantic HTML elements</p>
+                            <p className="text-xs text-slate-400">Replace divs with appropriate elements like nav, main, article, section</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3 p-3 bg-slate-700/30 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 mt-1" />
+                          <div>
+                            <p className="text-sm text-white font-medium">Add alt text to images</p>
+                            <p className="text-xs text-slate-400">All images should have descriptive alt attributes</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* SEO Deep Dive */}
+                <TabsContent value="seo" className="p-8">
+                  <div className="space-y-8">
+                    <h4 className="text-xl font-bold text-white flex items-center space-x-2">
+                      <Star className="h-5 w-5 text-yellow-400" />
+                      <span>SEO Analysis</span>
+                      <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                        {results.scores.seo}/100
+                      </Badge>
+                    </h4>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* SEO Score Breakdown */}
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">SEO Score</h5>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-300">Overall Score</span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-2xl font-bold text-white">{results.scores.seo}</span>
+                              <Badge className={`${
+                                results.scores.seo >= 90 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                                results.scores.seo >= 50 ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                                "bg-red-500/20 text-red-300 border-red-500/30"
+                              }`}>
+                                {results.scores.seo >= 90 ? "Excellent" :
+                                 results.scores.seo >= 50 ? "Good" : "Needs Work"}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="w-full bg-slate-700 rounded-full h-3">
+                            <div
+                              className="h-3 rounded-full transition-all duration-1000"
+                              style={{
+                                width: `${results.scores.seo}%`,
+                                backgroundColor: getScoreColor(results.scores.seo),
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Key SEO Areas */}
+                      <div className="bg-slate-800/30 rounded-xl p-6">
+                        <h5 className="text-white font-semibold mb-4">Key Areas</h5>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <FileImage className="h-4 w-4 text-blue-400" />
+                              <span className="text-sm text-slate-300">Image Optimization</span>
+                            </div>
+                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">Critical</Badge>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Code className="h-4 w-4 text-purple-400" />
+                              <span className="text-sm text-slate-300">Meta Tags</span>
+                            </div>
+                            <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">Important</Badge>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Globe className="h-4 w-4 text-green-400" />
+                              <span className="text-sm text-slate-300">Mobile Friendly</span>
+                            </div>
+                            <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Good</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SEO Recommendations */}
+                    <div className="bg-slate-800/30 rounded-xl p-6">
+                      <h5 className="text-white font-semibold mb-4">Recommendations</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3 p-3 bg-slate-700/30 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 mt-1" />
+                          <div>
+                            <p className="text-sm text-white font-medium">Optimize images with proper formats</p>
+                            <p className="text-xs text-slate-400">Use WebP, AVIF formats and implement lazy loading</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3 p-3 bg-slate-700/30 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 mt-1" />
+                          <div>
+                            <p className="text-sm text-white font-medium">Add comprehensive meta tags</p>
+                            <p className="text-xs text-slate-400">Include title, description, and Open Graph tags</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-3 p-3 bg-slate-700/30 rounded-lg">
+                          <CheckCircle2 className="h-4 w-4 text-green-400 mt-1" />
+                          <div>
+                            <p className="text-sm text-white font-medium">Implement structured data</p>
+                            <p className="text-xs text-slate-400">Add JSON-LD schema markup for better search visibility</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
             </Card>
 
@@ -1362,10 +2066,147 @@ export default function AccuratePerformanceAnalyzer() {
                       <Download className="h-4 w-4 mr-2" />
                       Export JSON
                     </Button>
+                    <Button
+                      onClick={exportHistoryCSV}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                    <Button
+                      onClick={exportPDF}
+                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white border-0 shadow-lg shadow-red-500/25"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export PDF
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Mobile vs Desktop Comparison */}
+            {compareMode && desktopResults && mobileResults && (
+              <Card className="bg-slate-900/50 backdrop-blur-xl border-slate-700/50">
+                <CardContent className="p-8">
+                  <div className="space-y-8">
+                    <div className="flex items-center space-x-3 mb-6">
+                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                        <BarChart3 className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-white">
+                          Mobile vs Desktop Comparison
+                        </h3>
+                        <p className="text-slate-400">
+                          Side-by-side performance analysis
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Desktop Results */}
+                      <div className="space-y-6">
+                        <div className="flex items-center space-x-3">
+                          <Monitor className="h-6 w-6 text-blue-400" />
+                          <h4 className="text-xl font-bold text-white">Desktop</h4>
+                          <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                            {desktopResults.scores.performance}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">Performance</p>
+                            <p className="text-2xl font-bold text-white">
+                              {desktopResults.scores.performance}
+                            </p>
+                          </div>
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">LCP</p>
+                            <p className="text-lg font-semibold text-white">
+                              {formatTime(desktopResults.metrics.largestContentfulPaint)}
+                            </p>
+                          </div>
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">INP</p>
+                            <p className="text-lg font-semibold text-white">
+                              {formatTime(desktopResults.metrics.interactionToNextPaint || 0)}
+                            </p>
+                          </div>
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">CLS</p>
+                            <p className="text-lg font-semibold text-white">
+                              {desktopResults.metrics.cumulativeLayoutShift.toFixed(3)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mobile Results */}
+                      <div className="space-y-6">
+                        <div className="flex items-center space-x-3">
+                          <Smartphone className="h-6 w-6 text-purple-400" />
+                          <h4 className="text-xl font-bold text-white">Mobile</h4>
+                          <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                            {mobileResults.scores.performance}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">Performance</p>
+                            <p className="text-2xl font-bold text-white">
+                              {mobileResults.scores.performance}
+                            </p>
+                          </div>
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">LCP</p>
+                            <p className="text-lg font-semibold text-white">
+                              {formatTime(mobileResults.metrics.largestContentfulPaint)}
+                            </p>
+                          </div>
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">INP</p>
+                            <p className="text-lg font-semibold text-white">
+                              {formatTime(mobileResults.metrics.interactionToNextPaint || 0)}
+                            </p>
+                          </div>
+                          <div className="bg-slate-800/30 rounded-lg p-4">
+                            <p className="text-sm text-slate-400 mb-1">CLS</p>
+                            <p className="text-lg font-semibold text-white">
+                              {mobileResults.metrics.cumulativeLayoutShift.toFixed(3)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Comparison Chart */}
+                    <div className="bg-slate-800/30 rounded-xl p-6">
+                      <h5 className="text-white font-semibold mb-4">Performance Comparison</h5>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart
+                          data={[
+                            { metric: "Performance", Desktop: desktopResults.scores.performance, Mobile: mobileResults.scores.performance },
+                            { metric: "Accessibility", Desktop: desktopResults.scores.accessibility, Mobile: mobileResults.scores.accessibility },
+                            { metric: "Best Practices", Desktop: desktopResults.scores.bestPractices, Mobile: mobileResults.scores.bestPractices },
+                            { metric: "SEO", Desktop: desktopResults.scores.seo, Mobile: mobileResults.scores.seo },
+                          ]}
+                        >
+                          <XAxis dataKey="metric" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ backgroundColor: 'rgba(15,23,42,0.95)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 12, color: '#fff' }} />
+                          <Legend />
+                          <Bar dataKey="Desktop" fill="#3b82f6" />
+                          <Bar dataKey="Mobile" fill="#8b5cf6" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
