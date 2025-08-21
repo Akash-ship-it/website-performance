@@ -223,7 +223,7 @@ export default function AccuratePerformanceAnalyzer() {
     setIsAnalyzing(true);
     setError(null);
     setProgress(0);
-    setCurrentStep(compareMode ? "Initializing dual-device analysis..." : "Initializing PageSpeed Insights analysis...");
+    setCurrentStep(compareMode ? "Initializing dual-device analysis..." : "Initializing Perfex analysis...");
 
     try {
       const testUrl = url.startsWith("http") ? url : `https://${url}`;
@@ -265,7 +265,7 @@ export default function AccuratePerformanceAnalyzer() {
       }, 500);
 
     } catch (err: any) {
-      console.error("PageSpeed analysis error:", err);
+      console.error("Perfex analysis error:", err);
       let errorMessage = "Analysis failed. Please check the URL and try again.";
       
       if (err.message.includes("PageSpeed API Error")) {
@@ -352,7 +352,7 @@ export default function AccuratePerformanceAnalyzer() {
       imageSize: audits['resource-summary']?.details?.items?.find((item: any) => 
         item.resourceType === 'image')?.size || 0,
       scriptSize: audits['resource-summary']?.details?.items?.find((item: any) => 
-        item.resourceType === 'stylesheet')?.size || 0,
+        item.resourceType === 'script')?.size || 0,
       stylesheetSize: audits['resource-summary']?.details?.items?.find((item: any) => 
         item.resourceType === 'stylesheet')?.size || 0,
       resourceCount: audits['resource-summary']?.details?.items?.reduce((sum: number, item: any) => 
@@ -951,12 +951,12 @@ export default function AccuratePerformanceAnalyzer() {
                         <span className="truncate">{results.url.replace(/^https?:\/\//, "")}</span>
                       </div>
                       <div className="flex items-center space-x-3 text-sm text-slate-300">
-                        {device === "desktop" ? (
+                        {(results.device === "desktop") ? (
                           <Monitor className="h-4 w-4 text-purple-400" />
                         ) : (
                           <Smartphone className="h-4 w-4 text-cyan-400" />
                         )}
-                        <span>{device === "desktop" ? "Desktop Analysis" : "Mobile Analysis"}</span>
+                        <span>{(results.device === "desktop") ? "Desktop Analysis" : "Mobile Analysis"}</span>
                       </div>
                       <div className="flex items-center space-x-3 text-sm text-slate-300">
                         <Clock className="h-4 w-4 text-green-400" />
