@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
@@ -19,10 +20,7 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  RadialBarChart,
-  RadialBar,
 } from "recharts";
-import jsPDF from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Accordion,
   AccordionContent,
@@ -60,7 +58,6 @@ import {
   Palette,
   Star,
   Target,
-  ArrowRight,
   Play,
   BarChart3,
   Activity,
@@ -68,12 +65,8 @@ import {
   Sparkles,
   Shield,
   Rocket,
-  Crown,
   Award,
-  ChevronDown,
   ExternalLink,
-  Settings,
-  RefreshCw,
   Info,
 } from "lucide-react";
 import Image from "next/image";
@@ -206,6 +199,7 @@ export default function AccuratePerformanceAnalyzer() {
   >(null);
 
   const analysisCacheRef = useRef<Map<string, PageSpeedMetrics>>(new Map());
+  const mobileTabsRef = useRef<HTMLDivElement | null>(null);
 
   const PAGESPEED_API_KEY = process.env.NEXT_PUBLIC_PAGESPEED_API_KEY || ""; // Add your API key here
   const PAGESPEED_API_BASE =
@@ -231,6 +225,13 @@ export default function AccuratePerformanceAnalyzer() {
       } catch (error) {
         console.error("Failed to parse saved opportunities:", error);
       }
+    }
+  }, []);
+
+  // Ensure mobile tabs start at the first item on mount
+  useEffect(() => {
+    if (mobileTabsRef.current) {
+      mobileTabsRef.current.scrollTo({ left: 0, behavior: "auto" });
     }
   }, []);
 
@@ -323,16 +324,17 @@ export default function AccuratePerformanceAnalyzer() {
         setProgress(0);
         setCurrentStep("");
       }, 500);
-    } catch (err: any) {
-      console.error("Perfex analysis error:", err);
+    } catch (err) {
+      const errorObj = err as Error;
+      console.error("Perfex analysis error:", errorObj);
       let errorMessage = "Analysis failed. Please check the URL and try again.";
 
-      if (err.message.includes("PageSpeed API Error")) {
+      if (errorObj.message.includes("PageSpeed API Error")) {
         errorMessage =
           "Perfex Performance Engine is currently unavailable. Please try again later.";
-      } else if (err.message.includes("Invalid URL")) {
+      } else if (errorObj.message.includes("Invalid URL")) {
         errorMessage = "Please enter a valid URL (e.g., https://example.com)";
-      } else if (err.message.includes("Network")) {
+      } else if (errorObj.message.includes("Network")) {
         errorMessage =
           "Network error. Please check your connection and try again.";
       }
@@ -394,34 +396,38 @@ export default function AccuratePerformanceAnalyzer() {
     };
 
     // Performance optimization opportunities
-    const opportunities = Object.entries(audits)
-      .filter(
-        ([key, audit]: [string, any]) =>
+    const opportunities = (Object.entries(audits) as Array<[
+      string,
+      { scoreDisplayMode?: string; numericValue?: number; details?: { overallSavingsMs?: number }; title?: string; description?: string; displayValue?: string }
+    ]>)
+      .filter(([, audit]) =>
           audit.scoreDisplayMode === "numeric" &&
-          audit.numericValue > 0 &&
-          audit.details?.overallSavingsMs > 100
+          (audit.numericValue ?? 0) > 0 &&
+          ((audit.details?.overallSavingsMs ?? 0) > 100)
       )
-      .map(([key, audit]: [string, any]) => ({
+      .map(([key, audit]) => ({
         id: key,
-        title: audit.title,
-        description: audit.description,
-        savings: audit.details?.overallSavingsMs || 0,
-        displayValue: audit.displayValue || "",
+        title: audit.title ?? "",
+        description: audit.description ?? "",
+        savings: audit.details?.overallSavingsMs ?? 0,
+        displayValue: audit.displayValue ?? "",
       }))
       .sort((a, b) => b.savings - a.savings)
       .slice(0, 10);
 
     // Diagnostics
-    const diagnostics = Object.entries(audits)
-      .filter(
-        ([key, audit]: [string, any]) =>
-          audit.scoreDisplayMode === "informative" && audit.displayValue
+    const diagnostics = (Object.entries(audits) as Array<[
+      string,
+      { scoreDisplayMode?: string; displayValue?: string; title?: string; description?: string }
+    ]>)
+      .filter(([, audit]) =>
+          audit.scoreDisplayMode === "informative" && Boolean(audit.displayValue)
       )
-      .map(([key, audit]: [string, any]) => ({
+      .map(([key, audit]) => ({
         id: key,
-        title: audit.title,
-        description: audit.description,
-        displayValue: audit.displayValue,
+        title: audit.title ?? "",
+        description: audit.description ?? "",
+        displayValue: audit.displayValue ?? "",
       }))
       .slice(0, 8);
 
@@ -429,24 +435,24 @@ export default function AccuratePerformanceAnalyzer() {
     const resourceSummary = {
       totalSize:
         audits["resource-summary"]?.details?.items?.reduce(
-          (sum: number, item: any) => sum + (item.size || 0),
+          (sum: number, item: { size?: number }) => sum + (item.size || 0),
           0
         ) || 0,
       imageSize:
         audits["resource-summary"]?.details?.items?.find(
-          (item: any) => item.resourceType === "image"
+          (item: { resourceType?: string; size?: number }) => item.resourceType === "image"
         )?.size || 0,
       scriptSize:
         audits["resource-summary"]?.details?.items?.find(
-          (item: any) => item.resourceType === "script"
+          (item: { resourceType?: string; size?: number }) => item.resourceType === "script"
         )?.size || 0,
       stylesheetSize:
         audits["resource-summary"]?.details?.items?.find(
-          (item: any) => item.resourceType === "stylesheet"
+          (item: { resourceType?: string; size?: number }) => item.resourceType === "stylesheet"
         )?.size || 0,
       resourceCount:
         audits["resource-summary"]?.details?.items?.reduce(
-          (sum: number, item: any) => sum + (item.requestCount || 0),
+          (sum: number, item: { requestCount?: number }) => sum + (item.requestCount || 0),
           0
         ) || 0,
     };
@@ -454,7 +460,7 @@ export default function AccuratePerformanceAnalyzer() {
     // Network requests for waterfall
     const networkRequests = (
       audits["network-requests"]?.details?.items || []
-    ).map((item: any) => ({
+    ).map((item: { url: string; transferSize?: number; resourceSize?: number; startTimeMs?: number; startTime?: number; endTimeMs?: number; endTime?: number; durationMs?: number; duration?: number; resourceType?: string }) => ({
       url: item.url,
       transferSize: item.transferSize || item.resourceSize || 0,
       startTime: item.startTimeMs ?? item.startTime ?? 0,
@@ -468,7 +474,7 @@ export default function AccuratePerformanceAnalyzer() {
 
     // Screenshot thumbnails and final screenshot
     const thumbnails = (audits["screenshot-thumbnails"]?.details?.items || [])
-      .map((it: any) => it.data)
+      .map((it: { data?: string }) => it.data)
       .filter(Boolean);
     const finalScreenshot = audits["final-screenshot"]?.details?.data || null;
 
@@ -634,6 +640,33 @@ export default function AccuratePerformanceAnalyzer() {
     ];
   };
 
+  // Defer rendering of heavy sections until they enter the viewport
+  const LazyRender: React.FC<{ children: React.ReactNode; rootMargin?: string }>
+    = ({ children, rootMargin = "200px" }) => {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+      if (isVisible) return;
+      const node = containerRef.current;
+      if (!node) return;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect();
+          }
+        },
+        { root: null, rootMargin, threshold: 0.01 }
+      );
+      observer.observe(node);
+      return () => observer.disconnect();
+    }, [isVisible, rootMargin]);
+
+    return <div ref={containerRef}>{isVisible ? children : null}</div>;
+  };
+
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -721,13 +754,13 @@ export default function AccuratePerformanceAnalyzer() {
     URL.revokeObjectURL(url);
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     if (!results) return;
 
+    const { default: jsPDF } = await import("jspdf");
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
-    const contentWidth = pageWidth - 2 * margin;
     let yPosition = 20;
 
     // Title
@@ -848,13 +881,6 @@ export default function AccuratePerformanceAnalyzer() {
   };
 
   const performanceScores = useMemo(() => getPerformanceScores(), [results]);
-  const overallScore =
-    performanceScores.length > 0
-      ? Math.round(
-          performanceScores.reduce((sum, score) => sum + score.score, 0) /
-            performanceScores.length
-        )
-      : 0;
   const metricCards = useMemo(() => getMetricCards(), [results]);
 
   const resourceData = useMemo(() => {
@@ -911,13 +937,16 @@ export default function AccuratePerformanceAnalyzer() {
     }
   }, [results?.networkRequests]);
 
-  const radialData = performanceScores.map((score) => ({
-    ...score,
-    fill: score.color,
-  }));
+  // decorative icons only
 
   return (
     <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] bg-slate-900 text-white px-3 py-2 rounded"
+      >
+        Skip to content
+      </a>
       <GradientBackground />
 
       {/* Header */}
@@ -942,7 +971,7 @@ export default function AccuratePerformanceAnalyzer() {
                 variant="secondary"
                 className="bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30 text-xs sm:text-sm px-1.5 sm:px-2"
               >
-                <Shield className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                <Shield className="h-2 w-2 sm:h-3 sm:w-3 mr-1" aria-hidden="true" />
                 <span className="hidden sm:inline">Perfex Engine</span>
                 <span className="sm:hidden">Engine</span>
               </Badge>
@@ -951,7 +980,7 @@ export default function AccuratePerformanceAnalyzer() {
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
+      <div id="main-content" className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16" role="main">
         {/* Hero Section */}
         <div className="text-center mb-8 sm:mb-16">
           <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-8">
@@ -972,7 +1001,7 @@ export default function AccuratePerformanceAnalyzer() {
           </h2>
 
           <p className="text-base sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed px-4">
-            Get advanced performance data from Perfex's infrastructure. Analyze
+            Get advanced performance data from Perfex&rsquo;s infrastructure. Analyze
             Core Web Vitals, accessibility, SEO, and get actionable optimization
             recommendations.
           </p>
@@ -996,23 +1025,44 @@ export default function AccuratePerformanceAnalyzer() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12">
+              <form
+                className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  analyzeWebsite();
+                }}
+                aria-label="Analyze website performance"
+              >
                 <div className="lg:col-span-7">
                   <div className="relative">
+                    <label htmlFor="target-url" className="sr-only">
+                      Target URL
+                    </label>
                     <Input
+                      id="target-url"
                       type="url"
+                      inputMode="url"
+                      autoComplete="url"
                       placeholder="Enter target URL (e.g., https://example.com)"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       className="h-12 sm:h-14 text-base sm:text-lg bg-slate-800/50 border-slate-600/50 focus:border-green-500 focus:ring-green-500/20 text-white placeholder-slate-400 pl-10 sm:pl-12 pr-4"
+                      aria-describedby="url-help"
+                      required
                     />
-                    <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
+                    <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" aria-hidden="true" />
+                    <p id="url-help" className="sr-only">
+                      Enter a full URL including protocol, like https://example.com
+                    </p>
                   </div>
                 </div>
 
                 <div className="lg:col-span-3">
+                  <label htmlFor="device-select" className="sr-only">
+                    Device
+                  </label>
                   <Select value={device} onValueChange={handleDeviceChange}>
-                    <SelectTrigger className="h-12 sm:h-14 bg-slate-800/50 border-slate-600/50 focus:border-green-500 text-white">
+                    <SelectTrigger id="device-select" className="h-12 sm:h-14 bg-slate-800/50 border-slate-600/50 focus:border-green-500 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700 text-white">
@@ -1037,9 +1087,10 @@ export default function AccuratePerformanceAnalyzer() {
 
                 <div className="lg:col-span-2">
                   <Button
-                    onClick={analyzeWebsite}
+                    type="submit"
                     disabled={isAnalyzing || !url}
-                    className="h-12 sm:h-14 w-full bg-gradient-to-r from-green-600 via-blue-600 to-cyan-600 hover:from-green-700 hover:via-blue-700 hover:to-cyan-700 text-white border-0 font-semibold shadow-lg shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                    className="h-12 sm:h-14 w-full bg-gradient-to-r from-green-600 via-blue-600 to-cyan-600 hover:from-green-700 hover:via-blue-700 hover:to-cyan-700 text-white border-0 font-semibold shadow-lg shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-400 focus-visible:ring-offset-slate-900"
+                    aria-live="polite"
                   >
                     {isAnalyzing ? (
                       <>
@@ -1064,7 +1115,7 @@ export default function AccuratePerformanceAnalyzer() {
                     )}
                   </Button>
                 </div>
-              </div>
+              </form>
 
               {/* Comparison Mode Toggle */}
               {/* <div className="flex items-center space-x-3 pt-4">
@@ -1208,9 +1259,9 @@ export default function AccuratePerformanceAnalyzer() {
                       </div>
                       <div className="flex items-center space-x-3 text-sm text-slate-300">
                         {results.device === "desktop" ? (
-                          <Monitor className="h-4 w-4 text-purple-400" />
+                          <Monitor className="h-4 w-4 text-purple-400" aria-hidden="true" />
                         ) : (
-                          <Smartphone className="h-4 w-4 text-cyan-400" />
+                          <Smartphone className="h-4 w-4 text-cyan-400" aria-hidden="true" />
                         )}
                         <span>
                           {results.device === "desktop"
@@ -1294,39 +1345,73 @@ export default function AccuratePerformanceAnalyzer() {
               <Tabs defaultValue="overview" className="w-full">
                 <div className="border-b border-slate-700/50 px-2 sm:px-8 pt-4 sm:pt-6">
                   {/* MOBILE TABS - Horizontal scroll */}
-                  <div className="sm:hidden">
-                    <TabsList className="w-full bg-slate-800/30 p-1 rounded-xl flex overflow-x-auto scrollbar-hide">
+                  <div className="sm:hidden relative">
+                    <div className="pointer-events-none absolute left-0 top-0 h-full w-4 bg-gradient-to-r from-slate-900/60 to-transparent rounded-l-xl" />
+                    <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-slate-900/60 to-transparent rounded-r-xl" />
+                    <TabsList
+                      className="w-full bg-slate-800/30 pl-1 pr-6 py-1 rounded-xl flex overflow-x-auto whitespace-nowrap touch-pan-x overscroll-x-contain scrollbar-hide snap-x snap-mandatory"
+                      ref={mobileTabsRef as any}
+                      style={{ WebkitOverflowScrolling: "touch", scrollBehavior: "smooth" }}
+                    >
                       <TabsTrigger
                         value="overview"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
                       >
-                        <BarChart3 className="h-3 w-3 mr-1" />
+                        <BarChart3 className="h-3 w-3 mr-1 flex-shrink-0" />
                         Scores
                       </TabsTrigger>
                       <TabsTrigger
                         value="vitals"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
                       >
-                        <Activity className="h-3 w-3 mr-1" />
+                        <Activity className="h-3 w-3 mr-1 flex-shrink-0" />
                         Vitals
                       </TabsTrigger>
                       <TabsTrigger
                         value="field-vs-lab"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
                       >
                         <Gauge className="h-3 w-3 mr-1" />
                         Lab
                       </TabsTrigger>
                       <TabsTrigger
+                        value="benchmark"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
+                      >
+                        <Target className="h-3 w-3 mr-1" />
+                        Benchmark
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="accessibility"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
+                      >
+                        <Shield className="h-3 w-3 mr-1" />
+                        A11y
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="seo"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
+                      >
+                        <Star className="h-3 w-3 mr-1" />
+                        SEO
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="diagnostics"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
+                      >
+                        <Info className="h-3 w-3 mr-1" />
+                        Diagnostics
+                      </TabsTrigger>
+                      <TabsTrigger
                         value="opportunities"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
                       >
                         <Target className="h-3 w-3 mr-1" />
                         Fix
                       </TabsTrigger>
                       <TabsTrigger
                         value="history"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-2 text-xs"
+                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
                       >
                         <TrendingUp className="h-3 w-3 mr-1" />
                         History
@@ -1464,8 +1549,9 @@ export default function AccuratePerformanceAnalyzer() {
 
                       {resourceData.length > 0 ? (
                         <div className="bg-slate-800/30 rounded-xl p-6">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
+                          <LazyRender>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <PieChart>
                               <Pie
                                 data={resourceData}
                                 cx="50%"
@@ -1498,8 +1584,9 @@ export default function AccuratePerformanceAnalyzer() {
                                   color: "white",
                                 }}
                               />
-                            </PieChart>
-                          </ResponsiveContainer>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </LazyRender>
                         </div>
                       ) : (
                         <div className="bg-slate-800/30 rounded-xl p-6 text-center">
@@ -1539,14 +1626,14 @@ export default function AccuratePerformanceAnalyzer() {
                                 />
                                 <Tooltip
                                   formatter={(
-                                    value: any,
-                                    key: any,
-                                    item: any
+                                    value: number | string,
+                                    key: string,
+                                    _item: unknown
                                   ) => {
                                     if (key === "duration")
-                                      return [formatTime(value), "Duration"];
+                                      return [formatTime(typeof value === "number" ? value : Number(value)), "Duration"];
                                     if (key === "size")
-                                      return [formatBytes(value), "Transfer"];
+                                      return [formatBytes(typeof value === "number" ? value : Number(value)), "Transfer"];
                                     return [value, key];
                                   }}
                                   contentStyle={{
@@ -1998,12 +2085,12 @@ export default function AccuratePerformanceAnalyzer() {
                     <div className="space-y-8">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xl font-bold text-white flex items-center space-x-2">
-                          <TrendingUp className="h-5 w-5 text-cyan-400" />
+                          <TrendingUp className="h-5 w-5 text-cyan-400" aria-hidden="true" />
                           <span>Performance History</span>
                         </h4>
                         <Button
                           onClick={exportHistoryCSV}
-                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25"
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-400 focus-visible:ring-offset-slate-900"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Export CSV
@@ -2011,8 +2098,9 @@ export default function AccuratePerformanceAnalyzer() {
                       </div>
 
                       <div className="bg-slate-800/30 rounded-xl p-6">
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={history.slice().reverse()}>
+                        <LazyRender>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={history.slice().reverse()}>
                             <XAxis
                               dataKey="timestamp"
                               tickFormatter={(ts) =>
@@ -2050,8 +2138,9 @@ export default function AccuratePerformanceAnalyzer() {
                               dot={{ fill: "#22c55e", strokeWidth: 2, r: 5 }}
                               activeDot={{ r: 8, fill: "#16a34a" }}
                             />
-                          </LineChart>
-                        </ResponsiveContainer>
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </LazyRender>
                       </div>
 
                       {/* Multi-Metric History Chart */}
@@ -2059,8 +2148,9 @@ export default function AccuratePerformanceAnalyzer() {
                         <h5 className="text-white font-semibold mb-4">
                           Core Web Vitals Trends
                         </h5>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={history.slice().reverse()}>
+                        <LazyRender>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={history.slice().reverse()}>
                             <XAxis
                               dataKey="timestamp"
                               tickFormatter={(ts) =>
@@ -2079,7 +2169,7 @@ export default function AccuratePerformanceAnalyzer() {
                               labelFormatter={(ts) =>
                                 new Date(ts).toLocaleString()
                               }
-                              formatter={(value: any, name: any) => {
+                              formatter={(value: number, name: string) => {
                                 if (name === "LCP")
                                   return [formatTime(value), "LCP"];
                                 if (name === "INP")
@@ -2120,8 +2210,9 @@ export default function AccuratePerformanceAnalyzer() {
                               strokeWidth={2}
                               dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
                             />
-                          </LineChart>
-                        </ResponsiveContainer>
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </LazyRender>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2227,8 +2318,9 @@ export default function AccuratePerformanceAnalyzer() {
                         <h5 className="text-white font-semibold mb-4">
                           Comparison (Lab vs Field P75)
                         </h5>
-                        <ResponsiveContainer width="100%" height={320}>
-                          <BarChart
+                        <LazyRender>
+                          <ResponsiveContainer width="100%" height={320}>
+                            <BarChart
                             data={["FCP", "LCP", "INP", "CLS"].map((k) => {
                               const lab = {
                                 FCP: results.metrics.firstContentfulPaint,
@@ -2241,7 +2333,7 @@ export default function AccuratePerformanceAnalyzer() {
                               }[k as "FCP"];
                               const fieldMetrics =
                                 results.loadingExperience?.metrics ||
-                                ({} as any);
+                                ({} as Record<string, never>);
                               const field = {
                                 FCP:
                                   fieldMetrics.FIRST_CONTENTFUL_PAINT_MS
@@ -2282,14 +2374,16 @@ export default function AccuratePerformanceAnalyzer() {
                             <Bar dataKey="Lab" fill="#60a5fa" />
                             <Bar dataKey="Field" fill="#34d399" />
                           </BarChart>
-                        </ResponsiveContainer>
+                          </ResponsiveContainer>
+                        </LazyRender>
                       </div>
                       <div className="bg-slate-800/30 rounded-xl p-6">
                         <h5 className="text-white font-semibold mb-4">
                           Vitals Radar
                         </h5>
-                        <ResponsiveContainer width="100%" height={320}>
-                          <RadarChart
+                        <LazyRender>
+                          <ResponsiveContainer width="100%" height={320}>
+                            <RadarChart
                             data={["FCP", "LCP", "INP", "CLS", "TBT"].map(
                               (k) => ({
                                 metric: k,
@@ -2359,7 +2453,8 @@ export default function AccuratePerformanceAnalyzer() {
                             />
                             <Legend />
                           </RadarChart>
-                        </ResponsiveContainer>
+                          </ResponsiveContainer>
+                        </LazyRender>
                       </div>
                     </div>
                     {!results.loadingExperience && (
@@ -2423,7 +2518,7 @@ export default function AccuratePerformanceAnalyzer() {
                             }
                           }
                         }}
-                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white border-0 shadow-lg shadow-amber-500/25"
+                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white border-0 shadow-lg shadow-amber-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-400 focus-visible:ring-offset-slate-900"
                       >
                         <Target className="h-4 w-4 mr-2" />
                         Run Benchmark
@@ -2442,8 +2537,9 @@ export default function AccuratePerformanceAnalyzer() {
                           <h6 className="text-white font-medium mb-4">
                             Performance Scores
                           </h6>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart
+                          <LazyRender>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart
                               data={benchmarkResults.map((result) => ({
                                 name: new URL(result.url).hostname.replace(
                                   /^www\./,
@@ -2480,8 +2576,9 @@ export default function AccuratePerformanceAnalyzer() {
                               <Bar dataKey="Accessibility" fill="#3b82f6" />
                               <Bar dataKey="Best Practices" fill="#8b5cf6" />
                               <Bar dataKey="SEO" fill="#f59e0b" />
-                            </BarChart>
-                          </ResponsiveContainer>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </LazyRender>
                         </div>
 
                         {/* Core Web Vitals Comparison */}
@@ -2839,7 +2936,7 @@ export default function AccuratePerformanceAnalyzer() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center space-x-3 sm:space-x-4">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                      <Download className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                      <Download className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden="true" />
                     </div>
                     <div>
                       <h4 className="text-lg sm:text-xl font-bold text-white">
@@ -2854,21 +2951,21 @@ export default function AccuratePerformanceAnalyzer() {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
                     <Button
                       onClick={exportResults}
-                      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-green-500/25 text-sm sm:text-base"
+                      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-green-500/25 text-sm sm:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-400 focus-visible:ring-offset-slate-900"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export JSON
                     </Button>
                     <Button
                       onClick={exportHistoryCSV}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25 text-sm sm:text-base"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 shadow-lg shadow-purple-500/25 text-sm sm:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-400 focus-visible:ring-offset-slate-900"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
                     </Button>
                     <Button
                       onClick={exportPDF}
-                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white border-0 shadow-lg shadow-red-500/25 text-sm sm:text-base"
+                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white border-0 shadow-lg shadow-red-500/25 text-sm sm:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-400 focus-visible:ring-offset-slate-900"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export PDF
@@ -3002,31 +3099,32 @@ export default function AccuratePerformanceAnalyzer() {
                       <h5 className="text-white font-semibold mb-4">
                         Performance Comparison
                       </h5>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                          data={[
-                            {
-                              metric: "Performance",
-                              Desktop: desktopResults.scores.performance,
-                              Mobile: mobileResults.scores.performance,
-                            },
-                            {
-                              metric: "Accessibility",
-                              Desktop: desktopResults.scores.accessibility,
-                              Mobile: mobileResults.scores.accessibility,
-                            },
-                            {
-                              metric: "Best Practices",
-                              Desktop: desktopResults.scores.bestPractices,
-                              Mobile: mobileResults.scores.bestPractices,
-                            },
-                            {
-                              metric: "SEO",
-                              Desktop: desktopResults.scores.seo,
-                              Mobile: mobileResults.scores.seo,
-                            },
-                          ]}
-                        >
+                      <LazyRender>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart
+                            data={[
+                              {
+                                metric: "Performance",
+                                Desktop: desktopResults.scores.performance,
+                                Mobile: mobileResults.scores.performance,
+                              },
+                              {
+                                metric: "Accessibility",
+                                Desktop: desktopResults.scores.accessibility,
+                                Mobile: mobileResults.scores.accessibility,
+                              },
+                              {
+                                metric: "Best Practices",
+                                Desktop: desktopResults.scores.bestPractices,
+                                Mobile: mobileResults.scores.bestPractices,
+                              },
+                              {
+                                metric: "SEO",
+                                Desktop: desktopResults.scores.seo,
+                                Mobile: mobileResults.scores.seo,
+                              },
+                            ]}
+                          >
                           <XAxis
                             dataKey="metric"
                             tick={{ fontSize: 12, fill: "#94a3b8" }}
@@ -3051,7 +3149,8 @@ export default function AccuratePerformanceAnalyzer() {
                           <Bar dataKey="Desktop" fill="#3b82f6" />
                           <Bar dataKey="Mobile" fill="#8b5cf6" />
                         </BarChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </LazyRender>
                     </div>
                   </div>
                 </CardContent>
