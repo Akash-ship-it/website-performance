@@ -231,9 +231,17 @@ export default function AccuratePerformanceAnalyzer() {
   // Ensure mobile tabs start at the first item on mount
   useEffect(() => {
     if (mobileTabsRef.current) {
-      mobileTabsRef.current.scrollTo({ left: 0, behavior: "auto" });
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        if (mobileTabsRef.current) {
+          mobileTabsRef.current.scrollTo({
+            left: 0,
+            behavior: "auto",
+          });
+        }
+      }, 100);
     }
-  }, []);
+  }, [results]); // Trigger when results change too
 
   // Auto-analyze when device changes (only if we have results for a different device)
   useEffect(() => {
@@ -396,14 +404,26 @@ export default function AccuratePerformanceAnalyzer() {
     };
 
     // Performance optimization opportunities
-    const opportunities = (Object.entries(audits) as Array<[
-      string,
-      { scoreDisplayMode?: string; numericValue?: number; details?: { overallSavingsMs?: number }; title?: string; description?: string; displayValue?: string }
-    ]>)
-      .filter(([, audit]) =>
+    const opportunities = (
+      Object.entries(audits) as Array<
+        [
+          string,
+          {
+            scoreDisplayMode?: string;
+            numericValue?: number;
+            details?: { overallSavingsMs?: number };
+            title?: string;
+            description?: string;
+            displayValue?: string;
+          }
+        ]
+      >
+    )
+      .filter(
+        ([, audit]) =>
           audit.scoreDisplayMode === "numeric" &&
           (audit.numericValue ?? 0) > 0 &&
-          ((audit.details?.overallSavingsMs ?? 0) > 100)
+          (audit.details?.overallSavingsMs ?? 0) > 100
       )
       .map(([key, audit]) => ({
         id: key,
@@ -416,12 +436,23 @@ export default function AccuratePerformanceAnalyzer() {
       .slice(0, 10);
 
     // Diagnostics
-    const diagnostics = (Object.entries(audits) as Array<[
-      string,
-      { scoreDisplayMode?: string; displayValue?: string; title?: string; description?: string }
-    ]>)
-      .filter(([, audit]) =>
-          audit.scoreDisplayMode === "informative" && Boolean(audit.displayValue)
+    const diagnostics = (
+      Object.entries(audits) as Array<
+        [
+          string,
+          {
+            scoreDisplayMode?: string;
+            displayValue?: string;
+            title?: string;
+            description?: string;
+          }
+        ]
+      >
+    )
+      .filter(
+        ([, audit]) =>
+          audit.scoreDisplayMode === "informative" &&
+          Boolean(audit.displayValue)
       )
       .map(([key, audit]) => ({
         id: key,
@@ -440,19 +471,23 @@ export default function AccuratePerformanceAnalyzer() {
         ) || 0,
       imageSize:
         audits["resource-summary"]?.details?.items?.find(
-          (item: { resourceType?: string; size?: number }) => item.resourceType === "image"
+          (item: { resourceType?: string; size?: number }) =>
+            item.resourceType === "image"
         )?.size || 0,
       scriptSize:
         audits["resource-summary"]?.details?.items?.find(
-          (item: { resourceType?: string; size?: number }) => item.resourceType === "script"
+          (item: { resourceType?: string; size?: number }) =>
+            item.resourceType === "script"
         )?.size || 0,
       stylesheetSize:
         audits["resource-summary"]?.details?.items?.find(
-          (item: { resourceType?: string; size?: number }) => item.resourceType === "stylesheet"
+          (item: { resourceType?: string; size?: number }) =>
+            item.resourceType === "stylesheet"
         )?.size || 0,
       resourceCount:
         audits["resource-summary"]?.details?.items?.reduce(
-          (sum: number, item: { requestCount?: number }) => sum + (item.requestCount || 0),
+          (sum: number, item: { requestCount?: number }) =>
+            sum + (item.requestCount || 0),
           0
         ) || 0,
     };
@@ -460,17 +495,30 @@ export default function AccuratePerformanceAnalyzer() {
     // Network requests for waterfall
     const networkRequests = (
       audits["network-requests"]?.details?.items || []
-    ).map((item: { url: string; transferSize?: number; resourceSize?: number; startTimeMs?: number; startTime?: number; endTimeMs?: number; endTime?: number; durationMs?: number; duration?: number; resourceType?: string }) => ({
-      url: item.url,
-      transferSize: item.transferSize || item.resourceSize || 0,
-      startTime: item.startTimeMs ?? item.startTime ?? 0,
-      endTime:
-        item.endTimeMs ??
-        item.endTime ??
-        (item.startTimeMs ?? item.startTime ?? 0) +
-          (item.durationMs ?? item.duration ?? 0),
-      resourceType: item.resourceType,
-    }));
+    ).map(
+      (item: {
+        url: string;
+        transferSize?: number;
+        resourceSize?: number;
+        startTimeMs?: number;
+        startTime?: number;
+        endTimeMs?: number;
+        endTime?: number;
+        durationMs?: number;
+        duration?: number;
+        resourceType?: string;
+      }) => ({
+        url: item.url,
+        transferSize: item.transferSize || item.resourceSize || 0,
+        startTime: item.startTimeMs ?? item.startTime ?? 0,
+        endTime:
+          item.endTimeMs ??
+          item.endTime ??
+          (item.startTimeMs ?? item.startTime ?? 0) +
+            (item.durationMs ?? item.duration ?? 0),
+        resourceType: item.resourceType,
+      })
+    );
 
     // Screenshot thumbnails and final screenshot
     const thumbnails = (audits["screenshot-thumbnails"]?.details?.items || [])
@@ -641,8 +689,10 @@ export default function AccuratePerformanceAnalyzer() {
   };
 
   // Defer rendering of heavy sections until they enter the viewport
-  const LazyRender: React.FC<{ children: React.ReactNode; rootMargin?: string }>
-    = ({ children, rootMargin = "200px" }) => {
+  const LazyRender: React.FC<{
+    children: React.ReactNode;
+    rootMargin?: string;
+  }> = ({ children, rootMargin = "200px" }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [isVisible, setIsVisible] = useState(false);
 
@@ -971,7 +1021,10 @@ export default function AccuratePerformanceAnalyzer() {
                 variant="secondary"
                 className="bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30 text-xs sm:text-sm px-1.5 sm:px-2"
               >
-                <Shield className="h-2 w-2 sm:h-3 sm:w-3 mr-1" aria-hidden="true" />
+                <Shield
+                  className="h-2 w-2 sm:h-3 sm:w-3 mr-1"
+                  aria-hidden="true"
+                />
                 <span className="hidden sm:inline">Perfex Engine</span>
                 <span className="sm:hidden">Engine</span>
               </Badge>
@@ -980,7 +1033,11 @@ export default function AccuratePerformanceAnalyzer() {
         </div>
       </div>
 
-      <div id="main-content" className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16" role="main">
+      <div
+        id="main-content"
+        className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16"
+        role="main"
+      >
         {/* Hero Section */}
         <div className="text-center mb-8 sm:mb-16">
           <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-8">
@@ -1001,9 +1058,9 @@ export default function AccuratePerformanceAnalyzer() {
           </h2>
 
           <p className="text-base sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed px-4">
-            Get advanced performance data from Perfex&rsquo;s infrastructure. Analyze
-            Core Web Vitals, accessibility, SEO, and get actionable optimization
-            recommendations.
+            Get advanced performance data from Perfex&rsquo;s infrastructure.
+            Analyze Core Web Vitals, accessibility, SEO, and get actionable
+            optimization recommendations.
           </p>
         </div>
 
@@ -1050,9 +1107,13 @@ export default function AccuratePerformanceAnalyzer() {
                       aria-describedby="url-help"
                       required
                     />
-                    <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" aria-hidden="true" />
+                    <Globe
+                      className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400"
+                      aria-hidden="true"
+                    />
                     <p id="url-help" className="sr-only">
-                      Enter a full URL including protocol, like https://example.com
+                      Enter a full URL including protocol, like
+                      https://example.com
                     </p>
                   </div>
                 </div>
@@ -1062,7 +1123,10 @@ export default function AccuratePerformanceAnalyzer() {
                     Device
                   </label>
                   <Select value={device} onValueChange={handleDeviceChange}>
-                    <SelectTrigger id="device-select" className="h-12 sm:h-14 bg-slate-800/50 border-slate-600/50 focus:border-green-500 text-white">
+                    <SelectTrigger
+                      id="device-select"
+                      className="h-12 sm:h-14 bg-slate-800/50 border-slate-600/50 focus:border-green-500 text-white"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700 text-white">
@@ -1220,16 +1284,16 @@ export default function AccuratePerformanceAnalyzer() {
                         </p>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0">
                         <div className="relative">
                           <div
-                            className={`text-7xl font-black mb-2 bg-gradient-to-r ${getScoreGradient(
+                            className={`text-4xl sm:text-5xl lg:text-7xl font-black mb-2 bg-gradient-to-r ${getScoreGradient(
                               results.scores.performance
-                            )} bg-clip-text text-transparent`}
+                            )} bg-clip-text text-transparent leading-none`}
                           >
                             {results.scores.performance}
                           </div>
-                          <div className="absolute -top-2 -right-6">
+                          <div className="absolute -top-1 sm:-top-2 -right-2 sm:-right-6">
                             <Badge
                               className={`${
                                 results.scores.performance >= 90
@@ -1237,7 +1301,7 @@ export default function AccuratePerformanceAnalyzer() {
                                   : results.scores.performance >= 50
                                   ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
                                   : "bg-red-500/20 text-red-300 border-red-500/30"
-                              } text-sm font-semibold`}
+                              } text-xs sm:text-sm font-semibold`}
                             >
                               {results.scores.performance >= 90
                                 ? "Fast"
@@ -1259,9 +1323,15 @@ export default function AccuratePerformanceAnalyzer() {
                       </div>
                       <div className="flex items-center space-x-3 text-sm text-slate-300">
                         {results.device === "desktop" ? (
-                          <Monitor className="h-4 w-4 text-purple-400" aria-hidden="true" />
+                          <Monitor
+                            className="h-4 w-4 text-purple-400"
+                            aria-hidden="true"
+                          />
                         ) : (
-                          <Smartphone className="h-4 w-4 text-cyan-400" aria-hidden="true" />
+                          <Smartphone
+                            className="h-4 w-4 text-cyan-400"
+                            aria-hidden="true"
+                          />
                         )}
                         <span>
                           {results.device === "desktop"
@@ -1346,77 +1416,87 @@ export default function AccuratePerformanceAnalyzer() {
                 <div className="border-b border-slate-700/50 px-2 sm:px-8 pt-4 sm:pt-6">
                   {/* MOBILE TABS - Horizontal scroll */}
                   <div className="sm:hidden relative">
-                    <div className="pointer-events-none absolute left-0 top-0 h-full w-4 bg-gradient-to-r from-slate-900/60 to-transparent rounded-l-xl" />
-                    <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-slate-900/60 to-transparent rounded-r-xl" />
-                    <TabsList
-                      className="w-full bg-slate-800/30 pl-1 pr-6 py-1 rounded-xl flex overflow-x-auto whitespace-nowrap touch-pan-x overscroll-x-contain scrollbar-hide snap-x snap-mandatory"
+                    <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-slate-900/60 to-transparent rounded-r-xl z-10" />
+                    <div
+                      className="overflow-x-auto overscroll-x-contain scrollbar-hide"
                       ref={mobileTabsRef as any}
-                      style={{ WebkitOverflowScrolling: "touch", scrollBehavior: "smooth" }}
+                      style={{
+                        WebkitOverflowScrolling: "touch",
+                        scrollBehavior: "smooth",
+                      }}
                     >
-                      <TabsTrigger
-                        value="overview"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <BarChart3 className="h-3 w-3 mr-1 flex-shrink-0" />
-                        Scores
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="vitals"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Activity className="h-3 w-3 mr-1 flex-shrink-0" />
-                        Vitals
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="field-vs-lab"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Gauge className="h-3 w-3 mr-1" />
-                        Lab
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="benchmark"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Target className="h-3 w-3 mr-1" />
-                        Benchmark
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="accessibility"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Shield className="h-3 w-3 mr-1" />
-                        A11y
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="seo"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Star className="h-3 w-3 mr-1" />
-                        SEO
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="diagnostics"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Info className="h-3 w-3 mr-1" />
-                        Diagnostics
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="opportunities"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <Target className="h-3 w-3 mr-1" />
-                        Fix
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="history"
-                        className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs snap-start"
-                      >
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        History
-                      </TabsTrigger>
-                    </TabsList>
+                      <TabsList className="inline-flex w-max bg-slate-800/30 p-1 rounded-xl min-w-full">
+                        <TabsTrigger
+                          value="overview"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs ml-2"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <BarChart3 className="h-3 w-3 flex-shrink-0" />
+                            <span>Scores</span>
+                          </span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="vitals"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <Activity className="h-3 w-3 flex-shrink-0" />
+                            <span>Vitals</span>
+                          </span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="field-vs-lab"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <Gauge className="h-3 w-3 flex-shrink-0" />
+                            <span>Lab</span>
+                          </span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="benchmark"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <Target className="h-3 w-3 mr-1" />
+                          Benchmark
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="accessibility"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <Shield className="h-3 w-3 mr-1" />
+                          A11y
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="seo"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <Star className="h-3 w-3 mr-1" />
+                          SEO
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="diagnostics"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <Info className="h-3 w-3 mr-1" />
+                          Diagnostics
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="opportunities"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs"
+                        >
+                          <Target className="h-3 w-3 mr-1" />
+                          Fix
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="history"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-slate-300 rounded-lg flex-shrink-0 px-3 py-3 text-xs mr-2"
+                        >
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          History
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
                   </div>
 
                   {/* DESKTOP TABS - Grid layout */}
@@ -1552,38 +1632,39 @@ export default function AccuratePerformanceAnalyzer() {
                           <LazyRender>
                             <ResponsiveContainer width="100%" height={300}>
                               <PieChart>
-                              <Pie
-                                data={resourceData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={120}
-                                paddingAngle={5}
-                                dataKey="value"
-                              >
-                                {resourceData.map((entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={entry.color}
-                                  />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                formatter={(value) => [
-                                  formatBytes(
-                                    typeof value === "number"
-                                      ? value
-                                      : Number(value)
-                                  ),
-                                  "Size",
-                                ]}
-                                contentStyle={{
-                                  backgroundColor: "rgba(15, 23, 42, 0.9)",
-                                  border: "1px solid rgba(148, 163, 184, 0.3)",
-                                  borderRadius: "12px",
-                                  color: "white",
-                                }}
-                              />
+                                <Pie
+                                  data={resourceData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={60}
+                                  outerRadius={120}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                                >
+                                  {resourceData.map((entry, index) => (
+                                    <Cell
+                                      key={`cell-${index}`}
+                                      fill={entry.color}
+                                    />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  formatter={(value) => [
+                                    formatBytes(
+                                      typeof value === "number"
+                                        ? value
+                                        : Number(value)
+                                    ),
+                                    "Size",
+                                  ]}
+                                  contentStyle={{
+                                    backgroundColor: "rgba(15, 23, 42, 0.9)",
+                                    border:
+                                      "1px solid rgba(148, 163, 184, 0.3)",
+                                    borderRadius: "12px",
+                                    color: "white",
+                                  }}
+                                />
                               </PieChart>
                             </ResponsiveContainer>
                           </LazyRender>
@@ -1631,9 +1712,23 @@ export default function AccuratePerformanceAnalyzer() {
                                     _item: unknown
                                   ) => {
                                     if (key === "duration")
-                                      return [formatTime(typeof value === "number" ? value : Number(value)), "Duration"];
+                                      return [
+                                        formatTime(
+                                          typeof value === "number"
+                                            ? value
+                                            : Number(value)
+                                        ),
+                                        "Duration",
+                                      ];
                                     if (key === "size")
-                                      return [formatBytes(typeof value === "number" ? value : Number(value)), "Transfer"];
+                                      return [
+                                        formatBytes(
+                                          typeof value === "number"
+                                            ? value
+                                            : Number(value)
+                                        ),
+                                        "Transfer",
+                                      ];
                                     return [value, key];
                                   }}
                                   contentStyle={{
@@ -2085,7 +2180,10 @@ export default function AccuratePerformanceAnalyzer() {
                     <div className="space-y-8">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xl font-bold text-white flex items-center space-x-2">
-                          <TrendingUp className="h-5 w-5 text-cyan-400" aria-hidden="true" />
+                          <TrendingUp
+                            className="h-5 w-5 text-cyan-400"
+                            aria-hidden="true"
+                          />
                           <span>Performance History</span>
                         </h4>
                         <Button
@@ -2101,43 +2199,43 @@ export default function AccuratePerformanceAnalyzer() {
                         <LazyRender>
                           <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={history.slice().reverse()}>
-                            <XAxis
-                              dataKey="timestamp"
-                              tickFormatter={(ts) =>
-                                new Date(ts).toLocaleDateString()
-                              }
-                              tick={{ fontSize: 12, fill: "#94a3b8" }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12, fill: "#94a3b8" }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              labelFormatter={(ts) =>
-                                new Date(ts).toLocaleString()
-                              }
-                              formatter={(value: any) => [
-                                value,
-                                "Performance Score",
-                              ]}
-                              contentStyle={{
-                                backgroundColor: "rgba(15, 23, 42, 0.95)",
-                                border: "1px solid rgba(148, 163, 184, 0.3)",
-                                borderRadius: "12px",
-                                color: "white",
-                              }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="scores.performance"
-                              stroke="#22c55e"
-                              strokeWidth={3}
-                              dot={{ fill: "#22c55e", strokeWidth: 2, r: 5 }}
-                              activeDot={{ r: 8, fill: "#16a34a" }}
-                            />
+                              <XAxis
+                                dataKey="timestamp"
+                                tickFormatter={(ts) =>
+                                  new Date(ts).toLocaleDateString()
+                                }
+                                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <Tooltip
+                                labelFormatter={(ts) =>
+                                  new Date(ts).toLocaleString()
+                                }
+                                formatter={(value: any) => [
+                                  value,
+                                  "Performance Score",
+                                ]}
+                                contentStyle={{
+                                  backgroundColor: "rgba(15, 23, 42, 0.95)",
+                                  border: "1px solid rgba(148, 163, 184, 0.3)",
+                                  borderRadius: "12px",
+                                  color: "white",
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="scores.performance"
+                                stroke="#22c55e"
+                                strokeWidth={3}
+                                dot={{ fill: "#22c55e", strokeWidth: 2, r: 5 }}
+                                activeDot={{ r: 8, fill: "#16a34a" }}
+                              />
                             </LineChart>
                           </ResponsiveContainer>
                         </LazyRender>
@@ -2151,65 +2249,65 @@ export default function AccuratePerformanceAnalyzer() {
                         <LazyRender>
                           <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={history.slice().reverse()}>
-                            <XAxis
-                              dataKey="timestamp"
-                              tickFormatter={(ts) =>
-                                new Date(ts).toLocaleDateString()
-                              }
-                              tick={{ fontSize: 12, fill: "#94a3b8" }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12, fill: "#94a3b8" }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              labelFormatter={(ts) =>
-                                new Date(ts).toLocaleString()
-                              }
-                              formatter={(value: number, name: string) => {
-                                if (name === "LCP")
-                                  return [formatTime(value), "LCP"];
-                                if (name === "INP")
-                                  return [formatTime(value), "INP"];
-                                if (name === "FCP")
-                                  return [formatTime(value), "FCP"];
-                                return [value, name];
-                              }}
-                              contentStyle={{
-                                backgroundColor: "rgba(15, 23, 42, 0.95)",
-                                border: "1px solid rgba(148, 163, 184, 0.3)",
-                                borderRadius: "12px",
-                                color: "white",
-                              }}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="metrics.largestContentfulPaint"
-                              name="LCP"
-                              stroke="#3b82f6"
-                              strokeWidth={2}
-                              dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="metrics.interactionToNextPaint"
-                              name="INP"
-                              stroke="#8b5cf6"
-                              strokeWidth={2}
-                              dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 4 }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="metrics.firstContentfulPaint"
-                              name="FCP"
-                              stroke="#10b981"
-                              strokeWidth={2}
-                              dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
-                            />
+                              <XAxis
+                                dataKey="timestamp"
+                                tickFormatter={(ts) =>
+                                  new Date(ts).toLocaleDateString()
+                                }
+                                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <Tooltip
+                                labelFormatter={(ts) =>
+                                  new Date(ts).toLocaleString()
+                                }
+                                formatter={(value: number, name: string) => {
+                                  if (name === "LCP")
+                                    return [formatTime(value), "LCP"];
+                                  if (name === "INP")
+                                    return [formatTime(value), "INP"];
+                                  if (name === "FCP")
+                                    return [formatTime(value), "FCP"];
+                                  return [value, name];
+                                }}
+                                contentStyle={{
+                                  backgroundColor: "rgba(15, 23, 42, 0.95)",
+                                  border: "1px solid rgba(148, 163, 184, 0.3)",
+                                  borderRadius: "12px",
+                                  color: "white",
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="metrics.largestContentfulPaint"
+                                name="LCP"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="metrics.interactionToNextPaint"
+                                name="INP"
+                                stroke="#8b5cf6"
+                                strokeWidth={2}
+                                dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 4 }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="metrics.firstContentfulPaint"
+                                name="FCP"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
+                              />
                             </LineChart>
                           </ResponsiveContainer>
                         </LazyRender>
@@ -2321,59 +2419,59 @@ export default function AccuratePerformanceAnalyzer() {
                         <LazyRender>
                           <ResponsiveContainer width="100%" height={320}>
                             <BarChart
-                            data={["FCP", "LCP", "INP", "CLS"].map((k) => {
-                              const lab = {
-                                FCP: results.metrics.firstContentfulPaint,
-                                LCP: results.metrics.largestContentfulPaint,
-                                INP:
-                                  results.metrics.interactionToNextPaint || 0,
-                                CLS:
-                                  (results.metrics.cumulativeLayoutShift || 0) *
-                                  1000, // scale for chart
-                              }[k as "FCP"];
-                              const fieldMetrics =
-                                results.loadingExperience?.metrics ||
-                                ({} as Record<string, never>);
-                              const field = {
-                                FCP:
-                                  fieldMetrics.FIRST_CONTENTFUL_PAINT_MS
-                                    ?.percentile || 0,
-                                LCP:
-                                  fieldMetrics.LARGEST_CONTENTFUL_PAINT_MS
-                                    ?.percentile || 0,
-                                INP:
-                                  fieldMetrics.INTERACTION_TO_NEXT_PAINT_MS
-                                    ?.percentile || 0,
-                                CLS:
-                                  (fieldMetrics.CUMULATIVE_LAYOUT_SHIFT_SCORE
-                                    ?.percentile || 0) * 10, // visual scale
-                              }[k as "FCP"];
-                              return { name: k, Lab: lab, Field: field };
-                            })}
-                          >
-                            <XAxis
-                              dataKey="name"
-                              tick={{ fontSize: 12, fill: "#94a3b8" }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12, fill: "#94a3b8" }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "rgba(15,23,42,0.95)",
-                                border: "1px solid rgba(148,163,184,0.3)",
-                                borderRadius: 12,
-                                color: "#fff",
-                              }}
-                            />
-                            <Legend />
-                            <Bar dataKey="Lab" fill="#60a5fa" />
-                            <Bar dataKey="Field" fill="#34d399" />
-                          </BarChart>
+                              data={["FCP", "LCP", "INP", "CLS"].map((k) => {
+                                const lab = {
+                                  FCP: results.metrics.firstContentfulPaint,
+                                  LCP: results.metrics.largestContentfulPaint,
+                                  INP:
+                                    results.metrics.interactionToNextPaint || 0,
+                                  CLS:
+                                    (results.metrics.cumulativeLayoutShift ||
+                                      0) * 1000, // scale for chart
+                                }[k as "FCP"];
+                                const fieldMetrics =
+                                  results.loadingExperience?.metrics ||
+                                  ({} as Record<string, never>);
+                                const field = {
+                                  FCP:
+                                    fieldMetrics.FIRST_CONTENTFUL_PAINT_MS
+                                      ?.percentile || 0,
+                                  LCP:
+                                    fieldMetrics.LARGEST_CONTENTFUL_PAINT_MS
+                                      ?.percentile || 0,
+                                  INP:
+                                    fieldMetrics.INTERACTION_TO_NEXT_PAINT_MS
+                                      ?.percentile || 0,
+                                  CLS:
+                                    (fieldMetrics.CUMULATIVE_LAYOUT_SHIFT_SCORE
+                                      ?.percentile || 0) * 10, // visual scale
+                                }[k as "FCP"];
+                                return { name: k, Lab: lab, Field: field };
+                              })}
+                            >
+                              <XAxis
+                                dataKey="name"
+                                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: "rgba(15,23,42,0.95)",
+                                  border: "1px solid rgba(148,163,184,0.3)",
+                                  borderRadius: 12,
+                                  color: "#fff",
+                                }}
+                              />
+                              <Legend />
+                              <Bar dataKey="Lab" fill="#60a5fa" />
+                              <Bar dataKey="Field" fill="#34d399" />
+                            </BarChart>
                           </ResponsiveContainer>
                         </LazyRender>
                       </div>
@@ -2384,75 +2482,75 @@ export default function AccuratePerformanceAnalyzer() {
                         <LazyRender>
                           <ResponsiveContainer width="100%" height={320}>
                             <RadarChart
-                            data={["FCP", "LCP", "INP", "CLS", "TBT"].map(
-                              (k) => ({
-                                metric: k,
-                                value: {
-                                  FCP: Math.min(
-                                    1,
-                                    1800 /
-                                      Math.max(
-                                        1,
-                                        results.metrics.firstContentfulPaint
-                                      )
-                                  ),
-                                  LCP: Math.min(
-                                    1,
-                                    2500 /
-                                      Math.max(
-                                        1,
-                                        results.metrics.largestContentfulPaint
-                                      )
-                                  ),
-                                  INP: Math.min(
-                                    1,
-                                    200 /
-                                      Math.max(
-                                        1,
-                                        results.metrics
-                                          .interactionToNextPaint || 1
-                                      )
-                                  ),
-                                  CLS: Math.min(
-                                    1,
-                                    0.1 /
-                                      Math.max(
-                                        0.001,
-                                        results.metrics.cumulativeLayoutShift
-                                      )
-                                  ),
-                                  TBT: Math.min(
-                                    1,
-                                    200 /
-                                      Math.max(
-                                        1,
-                                        results.metrics.totalBlockingTime
-                                      )
-                                  ),
-                                }[k as "FCP"],
-                              })
-                            )}
-                            outerRadius={120}
-                          >
-                            <PolarGrid />
-                            <PolarAngleAxis
-                              dataKey="metric"
-                              tick={{ fill: "#94a3b8", fontSize: 12 }}
-                            />
-                            <PolarRadiusAxis
-                              angle={30}
-                              domain={[0, 1]}
-                              tick={false}
-                            />
-                            <Radar
-                              name="Score"
-                              dataKey="value"
-                              stroke="#22c55e"
-                              fill="#22c55e"
-                              fillOpacity={0.5}
-                            />
-                            <Legend />
-                          </RadarChart>
+                              data={["FCP", "LCP", "INP", "CLS", "TBT"].map(
+                                (k) => ({
+                                  metric: k,
+                                  value: {
+                                    FCP: Math.min(
+                                      1,
+                                      1800 /
+                                        Math.max(
+                                          1,
+                                          results.metrics.firstContentfulPaint
+                                        )
+                                    ),
+                                    LCP: Math.min(
+                                      1,
+                                      2500 /
+                                        Math.max(
+                                          1,
+                                          results.metrics.largestContentfulPaint
+                                        )
+                                    ),
+                                    INP: Math.min(
+                                      1,
+                                      200 /
+                                        Math.max(
+                                          1,
+                                          results.metrics
+                                            .interactionToNextPaint || 1
+                                        )
+                                    ),
+                                    CLS: Math.min(
+                                      1,
+                                      0.1 /
+                                        Math.max(
+                                          0.001,
+                                          results.metrics.cumulativeLayoutShift
+                                        )
+                                    ),
+                                    TBT: Math.min(
+                                      1,
+                                      200 /
+                                        Math.max(
+                                          1,
+                                          results.metrics.totalBlockingTime
+                                        )
+                                    ),
+                                  }[k as "FCP"],
+                                })
+                              )}
+                              outerRadius={120}
+                            >
+                              <PolarGrid />
+                              <PolarAngleAxis
+                                dataKey="metric"
+                                tick={{ fill: "#94a3b8", fontSize: 12 }}
+                              />
+                              <PolarRadiusAxis
+                                angle={30}
+                                domain={[0, 1]}
+                                tick={false}
+                              />
+                              <Radar
+                                name="Score"
+                                dataKey="value"
+                                stroke="#22c55e"
+                                fill="#22c55e"
+                                fillOpacity={0.5}
+                              />
+                              <Legend />
+                            </RadarChart>
                           </ResponsiveContainer>
                         </LazyRender>
                       </div>
@@ -2540,42 +2638,42 @@ export default function AccuratePerformanceAnalyzer() {
                           <LazyRender>
                             <ResponsiveContainer width="100%" height={300}>
                               <BarChart
-                              data={benchmarkResults.map((result) => ({
-                                name: new URL(result.url).hostname.replace(
-                                  /^www\./,
-                                  ""
-                                ),
-                                Performance: result.scores.performance,
-                                Accessibility: result.scores.accessibility,
-                                "Best Practices": result.scores.bestPractices,
-                                SEO: result.scores.seo,
-                              }))}
-                            >
-                              <XAxis
-                                dataKey="name"
-                                tick={{ fontSize: 12, fill: "#94a3b8" }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <YAxis
-                                domain={[0, 100]}
-                                tick={{ fontSize: 12, fill: "#94a3b8" }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: "rgba(15,23,42,0.95)",
-                                  border: "1px solid rgba(148,163,184,0.3)",
-                                  borderRadius: 12,
-                                  color: "#fff",
-                                }}
-                              />
-                              <Legend />
-                              <Bar dataKey="Performance" fill="#22c55e" />
-                              <Bar dataKey="Accessibility" fill="#3b82f6" />
-                              <Bar dataKey="Best Practices" fill="#8b5cf6" />
-                              <Bar dataKey="SEO" fill="#f59e0b" />
+                                data={benchmarkResults.map((result) => ({
+                                  name: new URL(result.url).hostname.replace(
+                                    /^www\./,
+                                    ""
+                                  ),
+                                  Performance: result.scores.performance,
+                                  Accessibility: result.scores.accessibility,
+                                  "Best Practices": result.scores.bestPractices,
+                                  SEO: result.scores.seo,
+                                }))}
+                              >
+                                <XAxis
+                                  dataKey="name"
+                                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+                                <YAxis
+                                  domain={[0, 100]}
+                                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+                                <Tooltip
+                                  contentStyle={{
+                                    backgroundColor: "rgba(15,23,42,0.95)",
+                                    border: "1px solid rgba(148,163,184,0.3)",
+                                    borderRadius: 12,
+                                    color: "#fff",
+                                  }}
+                                />
+                                <Legend />
+                                <Bar dataKey="Performance" fill="#22c55e" />
+                                <Bar dataKey="Accessibility" fill="#3b82f6" />
+                                <Bar dataKey="Best Practices" fill="#8b5cf6" />
+                                <Bar dataKey="SEO" fill="#f59e0b" />
                               </BarChart>
                             </ResponsiveContainer>
                           </LazyRender>
@@ -2936,7 +3034,10 @@ export default function AccuratePerformanceAnalyzer() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   <div className="flex items-center space-x-3 sm:space-x-4">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                      <Download className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden="true" />
+                      <Download
+                        className="h-5 w-5 sm:h-6 sm:w-6 text-white"
+                        aria-hidden="true"
+                      />
                     </div>
                     <div>
                       <h4 className="text-lg sm:text-xl font-bold text-white">
@@ -3125,30 +3226,30 @@ export default function AccuratePerformanceAnalyzer() {
                               },
                             ]}
                           >
-                          <XAxis
-                            dataKey="metric"
-                            tick={{ fontSize: 12, fill: "#94a3b8" }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis
-                            domain={[0, 100]}
-                            tick={{ fontSize: 12, fill: "#94a3b8" }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "rgba(15,23,42,0.95)",
-                              border: "1px solid rgba(148,163,184,0.3)",
-                              borderRadius: 12,
-                              color: "#fff",
-                            }}
-                          />
-                          <Legend />
-                          <Bar dataKey="Desktop" fill="#3b82f6" />
-                          <Bar dataKey="Mobile" fill="#8b5cf6" />
-                        </BarChart>
+                            <XAxis
+                              dataKey="metric"
+                              tick={{ fontSize: 12, fill: "#94a3b8" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              domain={[0, 100]}
+                              tick={{ fontSize: 12, fill: "#94a3b8" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "rgba(15,23,42,0.95)",
+                                border: "1px solid rgba(148,163,184,0.3)",
+                                borderRadius: 12,
+                                color: "#fff",
+                              }}
+                            />
+                            <Legend />
+                            <Bar dataKey="Desktop" fill="#3b82f6" />
+                            <Bar dataKey="Mobile" fill="#8b5cf6" />
+                          </BarChart>
                         </ResponsiveContainer>
                       </LazyRender>
                     </div>
